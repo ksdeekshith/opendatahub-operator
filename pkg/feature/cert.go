@@ -20,9 +20,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	infrav1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/infrastructure/v1"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 )
 
-func (f *Feature) CreateSelfSignedCertificate(secretName string, certificateType infrav1.CertType, domain, namespace string) error {
+func CreateSelfSignedCertificate(ctx context.Context, c client.Client, secretName string,
+	certificateType infrav1.CertType, domain, namespace string, options ...cluster.MetaOptions) error {
 	if certificateType != infrav1.SelfSigned {
 		return nil
 	}
@@ -30,9 +32,10 @@ func (f *Feature) CreateSelfSignedCertificate(secretName string, certificateType
 	meta := metav1.ObjectMeta{
 		Name:      secretName,
 		Namespace: namespace,
-		OwnerReferences: []metav1.OwnerReference{
-			f.AsOwnerReference(),
-		},
+	}
+
+	if err := cluster.ApplyMetaOptions(&meta, options...); err != nil {
+		return err
 	}
 
 	certSecret, err := GenerateSelfSignedCertificateAsSecret(domain, meta)
@@ -40,7 +43,7 @@ func (f *Feature) CreateSelfSignedCertificate(secretName string, certificateType
 		return fmt.Errorf("failed generating self-signed certificate: %w", err)
 	}
 
-	if createErr := f.Client.Create(context.TODO(), certSecret); client.IgnoreAlreadyExists(createErr) != nil {
+	if createErr := c.Create(ctx, certSecret); client.IgnoreAlreadyExists(createErr) != nil {
 		return fmt.Errorf("failed creating certificate secret: %w", createErr)
 	}
 

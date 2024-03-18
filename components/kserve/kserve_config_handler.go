@@ -114,24 +114,24 @@ func (k *Kserve) setDefaultDeploymentMode(ctx context.Context, cli client.Client
 	return nil
 }
 
-func (k *Kserve) configureServerless(_ client.Client, instance *dsciv1.DSCInitializationSpec) error {
+func (k *Kserve) configureServerless(_ client.Client, dscispec *dsciv1.DSCInitializationSpec) error {
 	switch k.Serving.ManagementState {
 	case operatorv1.Unmanaged: // Bring your own CR
 		fmt.Println("Serverless CR is not configured by the operator, we won't do anything")
 
 	case operatorv1.Removed: // we remove serving CR
 		fmt.Println("existing Serverless CR (owned by operator) will be removed")
-		if err := k.removeServerlessFeatures(instance); err != nil {
+		if err := k.removeServerlessFeatures(dscispec); err != nil {
 			return err
 		}
 
 	case operatorv1.Managed: // standard workflow to create CR
-		switch instance.ServiceMesh.ManagementState {
+		switch dscispec.ServiceMesh.ManagementState {
 		case operatorv1.Unmanaged, operatorv1.Removed:
 			return fmt.Errorf("ServiceMesh is need to set to 'Managed' in DSCI CR, it is required by KServe serving field")
 		}
 
-		serverlessFeatures := feature.ComponentFeaturesHandler(k.GetComponentName(), instance, k.configureServerlessFeatures())
+		serverlessFeatures := feature.ComponentFeaturesHandler(k.GetComponentName(), dscispec.ApplicationsNamespace, k.configureServerlessFeatures(dscispec))
 
 		if err := serverlessFeatures.Apply(); err != nil {
 			return err
@@ -140,8 +140,8 @@ func (k *Kserve) configureServerless(_ client.Client, instance *dsciv1.DSCInitia
 	return nil
 }
 
-func (k *Kserve) removeServerlessFeatures(instance *dsciv1.DSCInitializationSpec) error {
-	serverlessFeatures := feature.ComponentFeaturesHandler(k.GetComponentName(), instance, k.configureServerlessFeatures())
+func (k *Kserve) removeServerlessFeatures(dscispec *dsciv1.DSCInitializationSpec) error {
+	serverlessFeatures := feature.ComponentFeaturesHandler(k.GetComponentName(), dscispec.ApplicationsNamespace, k.configureServerlessFeatures(dscispec))
 
 	return serverlessFeatures.Delete()
 }
