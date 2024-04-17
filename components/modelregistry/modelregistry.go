@@ -18,6 +18,8 @@ import (
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/deploy"
 )
 
+const modelRegistryNS = "odh-model-registries"
+
 var (
 	ComponentName = "model-registry-operator"
 	Path          = deploy.DefaultManifestPath + "/" + ComponentName + "/overlays/odh"
@@ -27,7 +29,7 @@ var (
 	// ).
 )
 
-// Verifies that ModelRegistry implements ComponentInterface.
+// Contracts for ModelRegistry component.
 var _ components.ComponentInterface = (*ModelRegistry)(nil)
 
 // ModelRegistry struct holds the configuration for the ModelRegistry component.
@@ -90,7 +92,7 @@ func (m *ModelRegistry) ReconcileComponent(_ context.Context, cli client.Client,
 
 		// Create odh-model-registries namespace
 		// We do not delete this namespace even when ModelRegistry is Removed or when operator is uninstalled.
-		_, err := cluster.CreateNamespace(cli, "odh-model-registries")
+		_, err := cluster.CreateNamespace(cli, modelRegistryNS)
 		if err != nil {
 			return err
 		}
