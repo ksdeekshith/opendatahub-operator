@@ -92,11 +92,13 @@ func (m *ModelRegistry) ReconcileComponent(_ context.Context, cli client.Client,
 
 		// Create odh-model-registries namespace
 		// We do not delete this namespace even when ModelRegistry is Removed or when operator is uninstalled.
-		_, err := cluster.CreateNamespace(cli, modelRegistryNS)
+		namespacedSMCP := fmt.Sprintf("%s/%s", dscispec.ServiceMesh.ControlPlane.Namespace, dscispec.ServiceMesh.ControlPlane.Name)
+		_, err := cluster.CreateNamespace(cli, modelRegistryNS, cluster.WithAnnotations("service-mesh.opendatahub.io/member-of", namespacedSMCP))
 		if err != nil {
 			return err
 		}
 	}
+
 	// Deploy ModelRegistry Operator
 	err = deploy.DeployManifestsFromPath(cli, owner, Path, dscispec.ApplicationsNamespace, m.GetComponentName(), enabled)
 	l.Info("apply manifests done")

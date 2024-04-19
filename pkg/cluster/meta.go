@@ -48,6 +48,19 @@ func WithLabels(labels ...string) MetaOptions {
 	}
 }
 
+func WithAnnotations(annotations ...string) MetaOptions {
+	return func(obj metav1.Object) error {
+		annotationsMap, err := extractKeyValues(annotations)
+		if err != nil {
+			return fmt.Errorf("failed unable to set labels: %w", err)
+		}
+
+		obj.SetAnnotations(annotationsMap)
+
+		return nil
+	}
+}
+
 func extractKeyValues(kv []string) (map[string]string, error) {
 	lenKV := len(kv)
 	if lenKV%2 != 0 {
