@@ -8,6 +8,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 )
 
 // Authorization is a contract for components that require authorization capability.
@@ -29,33 +31,25 @@ type ProtectedResource struct {
 // CreateAuthzRoleBinding defines roles which allow platform authorization component to handle protected resources.
 // TODO Remove counterpart.
 func CreateAuthzRoleBinding(ctx context.Context, cli client.Client, componentName string, protectedResources []ProtectedResource, verbs ...string) error {
+	name := componentName + "-role"
+
 	apiGroups := make([]string, 0)
 	resources := make([]string, 0)
-
 	for _, resource := range protectedResources {
 		apiGroups = append(apiGroups, resource.GroupVersionKind.Group)
 		resources = append(resources, resource.GroupVersionKind.Kind)
 	}
 
-	clusterRole := &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: componentName + "-role",
-		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				APIGroups: apiGroups,
-				Resources: resources,
-				Verbs:     verbs,
-			},
+	rules := []rbacv1.PolicyRule{
+		{
+			APIGroups: apiGroups,
+			Resources: resources,
+			Verbs:     verbs,
 		},
 	}
 
-	if err := cli.Get(ctx, client.ObjectKey{Name: clusterRole.Name, Namespace: clusterRole.Namespace}, clusterRole); client.IgnoreNotFound(err) != nil {
-		return err
-	}
-
-	if err := cli.Create(ctx, clusterRole); err != nil {
-		return fmt.Errorf("failed creating cluster role for %s: %w", componentName, err)
+	if _, roleErr := cluster.CreateClusterRole(ctx, cli, name, rules); roleErr != nil {
+		return fmt.Errorf("failed creating cluster role for %s: %w", componentName, roleErr)
 	}
 
 	clusterRoleBinding := &rbacv1.ClusterRoleBinding{

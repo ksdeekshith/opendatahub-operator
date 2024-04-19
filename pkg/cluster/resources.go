@@ -150,3 +150,29 @@ func CreateNamespace(cli client.Client, namespace string, metaOptions ...MetaOpt
 
 	return foundNamespace, nil
 }
+
+// CreateClusterRole creates cluster role based on define PolicyRules and optional metadata fields.
+func CreateClusterRole(ctx context.Context, cli client.Client, name string, rules []authv1.PolicyRule, metaOptions ...MetaOptions) (*authv1.ClusterRole, error) {
+	desiredClusterRole := &authv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Rules: rules,
+	}
+
+	if err := ApplyMetaOptions(desiredClusterRole, metaOptions...); err != nil {
+		return nil, err
+	}
+
+	foundClusterRole := &authv1.ClusterRole{}
+	if getErr := cli.Get(ctx, client.ObjectKey{Name: name}, foundClusterRole); client.IgnoreNotFound(getErr) != nil {
+		return nil, getErr
+	}
+
+	createErr := cli.Create(ctx, desiredClusterRole)
+	if apierrs.IsAlreadyExists(createErr) {
+		return foundClusterRole, nil
+	}
+
+	return desiredClusterRole, client.IgnoreAlreadyExists(createErr)
+}
