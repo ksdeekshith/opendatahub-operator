@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/afero"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/kustomize/kyaml/filesys"
 
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature"
 
@@ -124,6 +125,50 @@ data:
 			Expect(objs[0].GetNamespace()).To(Equal("template-ns"))
 		})
 
+	})
+
+	Describe("Kustomize Manifest Processing", func() {
+
+		BeforeEach(func() {
+			path = "/path/to/kustomization/"
+		})
+
+		It("should process the ConfigMap resource from the kustomize manifest", func() {
+			// given
+			kustomizationYaml := `
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- resource.yaml
+`
+			resourceYaml := `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-configmap
+data:
+  key: value
+`
+			data := feature.Spec{
+				TargetNamespace: "kust-ns",
+			}
+
+			kustFsys := filesys.MakeFsInMemory()
+
+			Expect(kustFsys.WriteFile(filepath.Join(path, "kustomization.yaml"), []byte(kustomizationYaml))).To(Succeed())
+			Expect(kustFsys.WriteFile(filepath.Join(path, "resource.yaml"), []byte(resourceYaml))).To(Succeed())
+			manifest := feature.CreateKustomizeManifestFrom("/path/to/kustomization/", kustFsys)
+
+			// when
+			manifests := []feature.Manifest{manifest}
+			objs := processManifests(data, manifests)
+
+			// then
+			Expect(objs).To(HaveLen(1))
+			configMap := objs[0]
+			Expect(configMap.GetKind()).To(Equal("ConfigMap"))
+			Expect(configMap.GetName()).To(Equal("my-configmap"))
+		})
 	})
 
 })
