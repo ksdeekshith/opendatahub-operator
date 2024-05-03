@@ -102,5 +102,7 @@ func (m *ModelRegistry) ReconcileComponent(_ context.Context, cli client.Client,
 	// Deploy ModelRegistry Operator
 	err = deploy.DeployManifestsFromPath(cli, owner, Path, dscispec.ApplicationsNamespace, m.GetComponentName(), enabled)
 	l.Info("apply manifests done")
-	return err
+
+	// TODO: temporarily assuming authorization is required:
+	return m.configureAuth(dscispec)
 }
