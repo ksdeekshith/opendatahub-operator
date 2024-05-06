@@ -59,8 +59,9 @@ func CreateAuthzRoleBinding(ctx context.Context, cli client.Client, componentNam
 		},
 		Subjects: []rbacv1.Subject{
 			{
-				Kind: rbacv1.ServiceAccountKind,
-				Name: "odh-platform-ctrl",
+				Kind:      rbacv1.ServiceAccountKind,
+				Name:      "odh-platform-ctrl",
+				Namespace: "opendatahub",
 			},
 		},
 		RoleRef: rbacv1.RoleRef{
@@ -70,7 +71,8 @@ func CreateAuthzRoleBinding(ctx context.Context, cli client.Client, componentNam
 		},
 	}
 
-	if err := cli.Get(ctx, client.ObjectKey{Name: clusterRoleBinding.Name, Namespace: clusterRoleBinding.Namespace}, clusterRoleBinding); client.IgnoreNotFound(err) != nil {
+	if err := cli.Get(ctx, client.ObjectKey{Name: clusterRoleBinding.Name,
+		Namespace: clusterRoleBinding.ObjectMeta.Namespace}, clusterRoleBinding); client.IgnoreNotFound(err) != nil {
 		return err
 	}
 

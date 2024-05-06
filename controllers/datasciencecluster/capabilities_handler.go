@@ -10,12 +10,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	dsc "github.com/opendatahub-io/opendatahub-operator/v2/apis/datasciencecluster/v1"
+	dsci "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/metadata/labels"
 	"github.com/opendatahub-io/opendatahub-operator/v2/platform/capabilities"
 )
 
-func (r *DataScienceClusterReconciler) configurePlatformCapabilities(ctx context.Context, instance *dsc.DataScienceCluster) error {
+func (r *DataScienceClusterReconciler) configurePlatformCapabilities(ctx context.Context, instance *dsc.DataScienceCluster, dsciSpec *dsci.DSCInitializationSpec) error {
 	allComponents, err := instance.GetComponents()
 	if err != nil {
 		return err
@@ -40,7 +41,7 @@ func (r *DataScienceClusterReconciler) configurePlatformCapabilities(ctx context
 	for i := range capabilitiesHandler {
 		defs, capabilityRequested := componentCapabilities[i]
 		if capabilityRequested && len(defs) != 0 { // there is at least one component requesting given capability
-			multiErr = multierror.Append(multiErr, capabilitiesHandler[i].Configure(ctx, r.Client))
+			multiErr = multierror.Append(multiErr, capabilitiesHandler[i].Configure(ctx, r.Client, dsciSpec))
 		}
 	}
 

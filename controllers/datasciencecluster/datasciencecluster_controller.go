@@ -229,7 +229,7 @@ func (r *DataScienceClusterReconciler) Reconcile(ctx context.Context, req ctrl.R
 	// Initialize error list, instead of returning errors after every component is deployed
 	var componentErrors *multierror.Error
 
-	if capabilityErr := r.configurePlatformCapabilities(ctx, instance); capabilityErr != nil {
+	if capabilityErr := r.configurePlatformCapabilities(ctx, instance, r.DataScienceCluster.DSCISpec); capabilityErr != nil {
 		r.Log.Error(capabilityErr, "failed to configure platform capabilities")
 		componentErrors = multierror.Append(componentErrors, capabilityErr)
 	}
