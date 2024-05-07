@@ -52,6 +52,7 @@ func CreateAuthzRoleBinding(ctx context.Context, cli client.Client, componentNam
 		return fmt.Errorf("failed creating cluster role for %s: %w", componentName, roleErr)
 	}
 
+	// todo: should not be hardcoding to "opendatahub", find clean way to pass namespace
 	clusterRoleBinding := &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      componentName + "-authz-capability",
