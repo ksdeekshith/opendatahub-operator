@@ -20,7 +20,7 @@ declare -A COMPONENT_MANIFESTS=(
     ["kserve"]="opendatahub-io:kserve:release-v0.11.1:config:kserve"
     ["modelregistry"]="opendatahub-io:model-registry-operator:main:config:model-registry-operator"
     ["trainingoperator"]="opendatahub-io:training-operator:dev:manifests:trainingoperator"
-    ["platform"]="maistra:odh-platform:main:config:platform"
+    ["platform"]="maistra:odh-platform:mvp:config:platform"
 )
 
 # Allow overwriting repo using flags component=repo

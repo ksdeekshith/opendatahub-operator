@@ -1,12 +1,8 @@
 package modelregistry
 
 import (
-	"context"
-
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"github.com/opendatahub-io/opendatahub-operator/v2/platform/capabilities"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 var _ capabilities.Authorization = (*ModelRegistry)(nil)
@@ -29,7 +25,5 @@ func (m *ModelRegistry) ProtectedResources() []capabilities.ProtectedResource {
 }
 
 func (m *ModelRegistry) AuthorizationConfigurationHook() capabilities.HookFunc {
-	return func(ctx context.Context, cli client.Client) error {
-		return capabilities.CreateAuthzRoleBinding(ctx, cli, m.GetComponentName(), m.ProtectedResources(), "get", "list", "watch")
-	}
+	return nil
 }

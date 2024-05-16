@@ -3,6 +3,7 @@ package capabilities
 import (
 	"context"
 	"fmt"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,7 +32,7 @@ type ProtectedResource struct {
 // CreateAuthzRoleBinding defines roles which allow platform authorization component to handle protected resources.
 // TODO Remove counterpart.
 func CreateAuthzRoleBinding(ctx context.Context, cli client.Client, componentName string, protectedResources []ProtectedResource, verbs ...string) error {
-	name := componentName + "-role"
+	name := componentName + "-watchers"
 
 	apiGroups := make([]string, 0)
 	resources := make([]string, 0)
@@ -61,7 +62,7 @@ func CreateAuthzRoleBinding(ctx context.Context, cli client.Client, componentNam
 		Subjects: []rbacv1.Subject{
 			{
 				Kind:      rbacv1.ServiceAccountKind,
-				Name:      "odh-platform-ctrl",
+				Name:      "odh-platform-manager",
 				Namespace: "opendatahub",
 			},
 		},
@@ -72,13 +73,18 @@ func CreateAuthzRoleBinding(ctx context.Context, cli client.Client, componentNam
 		},
 	}
 
-	if err := cli.Get(ctx, client.ObjectKey{Name: clusterRoleBinding.Name,
-		Namespace: clusterRoleBinding.ObjectMeta.Namespace}, clusterRoleBinding); client.IgnoreNotFound(err) != nil {
-		return err
-	}
-
-	if err := cli.Create(ctx, clusterRoleBinding); err != nil {
-		return fmt.Errorf("failed creating cluster role binding for %s: %w", componentName, err)
+	if err := cli.Get(ctx, client.ObjectKey{Name: clusterRoleBinding.Name, Namespace: clusterRoleBinding.Namespace}, clusterRoleBinding); err != nil {
+		if apierrs.IsNotFound(err) {
+			if err := cli.Create(ctx, clusterRoleBinding); err != nil {
+				return fmt.Errorf("failed creating cluster role binding for %s: %w", componentName, err)
+			}
+		} else {
+			return err
+		}
+	} else {
+		if err := cli.Update(ctx, clusterRoleBinding); err != nil {
+			return fmt.Errorf("failed updating cluster role binding for %s: %w", componentName, err)
+		}
 	}
 
 	return nil

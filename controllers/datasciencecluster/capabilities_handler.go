@@ -3,11 +3,11 @@ package datasciencecluster
 import (
 	"context"
 	"encoding/json"
-
 	"github.com/hashicorp/go-multierror"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dsc "github.com/opendatahub-io/opendatahub-operator/v2/apis/datasciencecluster/v1"
 	dsci "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
@@ -29,8 +29,11 @@ func (r *DataScienceClusterReconciler) configurePlatformCapabilities(ctx context
 	capabilitiesHandler[authName] = &capabilities.AuthorizationHandler{}
 
 	for _, component := range allComponents {
+		component := component
 		if authComponent, ok := component.(capabilities.Authorization); ok && component.GetManagementState() == operatorv1.Managed {
-			capabilitiesHandler[authName].AddConfigureHook(authComponent.AuthorizationConfigurationHook())
+			capabilitiesHandler[authName].AddConfigureHook(func(ctx context.Context, cli client.Client) error {
+				return capabilities.CreateAuthzRoleBinding(ctx, cli, component.GetComponentName(), authComponent.ProtectedResources(), "get", "list", "watch")
+			})
 			componentCapabilities[authName] = append(componentCapabilities[authName], authComponent.ProtectedResources())
 		}
 	}
