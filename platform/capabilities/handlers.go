@@ -33,15 +33,15 @@ func (a *AuthorizationHandler) Configure(ctx context.Context, cli client.Client,
 	return authInitializer.Apply()
 }
 
-func (a *AuthorizationHandler) Remove(ctx context.Context, cli client.Client) error {
+func (a *AuthorizationHandler) Remove(ctx context.Context, cli client.Client, dsciSpec *dsci.DSCInitializationSpec) error {
 	for _, hook := range a.hooksRegistry.configHooks {
 		if err := hook(ctx, cli); err != nil {
 			return err
 		}
 	}
-
-	// TODO implement removal/teardown
-	return nil
+	// todo: remove clusterrole + clusterrolebinding - they are not part of the feature currently so not deleted.
+	authInitializer := feature.ComponentFeaturesHandler("Platform", dsciSpec, defineAuthFeatures())
+	return authInitializer.Delete()
 }
 
 type hooksRegistry struct {

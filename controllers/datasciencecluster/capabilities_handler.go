@@ -3,6 +3,7 @@ package datasciencecluster
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/hashicorp/go-multierror"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -45,6 +46,8 @@ func (r *DataScienceClusterReconciler) configurePlatformCapabilities(ctx context
 		defs, capabilityRequested := componentCapabilities[i]
 		if capabilityRequested && len(defs) != 0 { // there is at least one component requesting given capability
 			multiErr = multierror.Append(multiErr, capabilitiesHandler[i].Configure(ctx, r.Client, dsciSpec))
+		} else {
+			multiErr = multierror.Append(multiErr, capabilitiesHandler[i].Remove(ctx, r.Client, dsciSpec))
 		}
 	}
 

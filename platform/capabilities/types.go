@@ -16,5 +16,5 @@ type Handler interface {
 	AddConfigureHook(HookFunc)
 	Configure(ctx context.Context, cli client.Client, dsciSpec *dsci.DSCInitializationSpec) error
 	AddRemoveHook(HookFunc)
-	Remove(ctx context.Context, cli client.Client) error
+	Remove(ctx context.Context, cli client.Client, dsciSpec *dsci.DSCInitializationSpec) error
 }

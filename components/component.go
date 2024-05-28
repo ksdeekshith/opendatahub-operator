@@ -44,7 +44,7 @@ func (c *Component) GetManagementState() operatorv1.ManagementState {
 }
 
 func (c *Component) Cleanup(_ client.Client, _ *dsciv1.DSCInitializationSpec) error {
-	// noop
+	c.ManagementState = operatorv1.Removed
 	return nil
 }
 
