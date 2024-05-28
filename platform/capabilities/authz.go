@@ -3,9 +3,9 @@ package capabilities
 import (
 	"context"
 	"fmt"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -25,6 +25,7 @@ type Authorization interface {
 type ProtectedResource struct {
 	schema.GroupVersionKind `json:"gvk,omitempty"`
 	WorkloadSelector        map[string]string `json:"workloadSelector,omitempty"`
+	Resources               string            `json:"resources,omitempty"`
 	HostPaths               []string          `json:"hostPaths,omitempty"`
 	Ports                   []string          `json:"ports,omitempty"`
 }
@@ -38,7 +39,7 @@ func CreateAuthzRoleBinding(ctx context.Context, cli client.Client, componentNam
 	resources := make([]string, 0)
 	for _, resource := range protectedResources {
 		apiGroups = append(apiGroups, resource.GroupVersionKind.Group)
-		resources = append(resources, resource.GroupVersionKind.Kind)
+		resources = append(resources, resource.Resources)
 	}
 
 	rules := []rbacv1.PolicyRule{

@@ -1,8 +1,9 @@
 package modelregistry
 
 import (
-	"github.com/opendatahub-io/opendatahub-operator/v2/platform/capabilities"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"github.com/opendatahub-io/opendatahub-operator/v2/platform/capabilities"
 )
 
 var _ capabilities.Authorization = (*ModelRegistry)(nil)
@@ -15,6 +16,7 @@ func (m *ModelRegistry) ProtectedResources() []capabilities.ProtectedResource {
 				Version: "v1alpha1",
 				Kind:    "ModelRegistry",
 			},
+			Resources: "modelregistries",
 			WorkloadSelector: map[string]string{
 				"app.kubernetes.io/component": "model-registry",
 			},
