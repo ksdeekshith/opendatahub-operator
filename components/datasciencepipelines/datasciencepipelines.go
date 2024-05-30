@@ -10,6 +10,8 @@ import (
 
 	"github.com/go-logr/logr"
 	operatorv1 "github.com/openshift/api/operator/v1"
+	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
+	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,9 +19,11 @@ import (
 
 	dsciv1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/components"
+	"github.com/opendatahub-io/opendatahub-operator/v2/controllers/status"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/deploy"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/metadata/labels"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/monitoring"
+	"github.com/opendatahub-io/opendatahub-operator/v2/platform/capabilities"
 )
 
 var (
@@ -66,6 +70,7 @@ func (d *DataSciencePipelines) ReconcileComponent(ctx context.Context,
 	owner metav1.Object,
 	dscispec *dsciv1.DSCInitializationSpec,
 	_ bool,
+	_ capabilities.PlatformCapabilities,
 ) error {
 	l := d.ConfigComponentLogger(logger, ComponentName, dscispec)
 	var imageParamMap = map[string]string{
@@ -166,4 +171,15 @@ func UnmanagedArgoWorkFlowExists(ctx context.Context,
 	}
 	return fmt.Errorf("%s CRD already exists but not deployed by this operator. "+
 		"Remove existing Argo workflows or set `spec.components.datasciencepipelines.managementState` to Removed to proceed ", ArgoWorkflowCRD)
+}
+
+func SetExistingArgoCondition(conditions *[]conditionsv1.Condition, reason, message string) {
+	conditionsv1.SetStatusCondition(conditions, conditionsv1.Condition{
+		Type:    status.CapabilityDSPv2Argo,
+		Status:  corev1.ConditionFalse,
+		Reason:  reason,
+		Message: message,
+	})
+
+	status.SetComponentCondition(conditions, ComponentName, status.ReconcileFailed, message, corev1.ConditionFalse)
 }

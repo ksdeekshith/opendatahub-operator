@@ -15,8 +15,10 @@ import (
 
 	dsciv1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/components"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/deploy"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/monitoring"
+	"github.com/opendatahub-io/opendatahub-operator/v2/platform/capabilities"
 )
 
 var (
@@ -26,9 +28,10 @@ var (
 	RHCodeflareOperator = "rhods-codeflare-operator"
 	ParamsPath          = deploy.DefaultManifestPath + "/" + ComponentName + "/manager"
 )
-
-// Verifies that CodeFlare implements ComponentInterface.
-var _ components.ComponentInterface = (*CodeFlare)(nil)
+var (
+	// Verifies that CodeFlare implements ComponentInterface.
+	_ components.ComponentInterface = (*CodeFlare)(nil)
+)
 
 // CodeFlare struct holds the configuration for the CodeFlare component.
 // +kubebuilder:object:generate=true
@@ -58,7 +61,10 @@ func (c *CodeFlare) GetComponentName() string {
 	return ComponentName
 }
 
-func (c *CodeFlare) ReconcileComponent(ctx context.Context, cli client.Client, logger logr.Logger, owner metav1.Object, dscispec *dsciv1.DSCInitializationSpec, _ bool) error {
+func (c *CodeFlare) ReconcileComponent(
+	ctx context.Context, cli client.Client, logger logr.Logger,
+	owner metav1.Object, dscispec *dsciv1.DSCInitializationSpec,
+	_ bool, _ capabilities.PlatformCapabilities) error {
 	l := c.ConfigComponentLogger(logger, ComponentName, dscispec)
 	var imageParamMap = map[string]string{
 		"codeflare-operator-controller-image": "RELATED_IMAGE_ODH_CODEFLARE_OPERATOR_IMAGE", // no need mcad, embedded in cfo
@@ -85,7 +91,7 @@ func (c *CodeFlare) ReconcileComponent(ctx context.Context, cli client.Client, l
 			dependentOperator = RHCodeflareOperator
 		}
 
-		if found, err := deploy.OperatorExists(cli, dependentOperator); err != nil {
+		if found, err := cluster.OperatorExists(cli, dependentOperator); err != nil {
 			return fmt.Errorf("operator exists throws error %w", err)
 		} else if found {
 			return fmt.Errorf("operator %s is found. Please uninstall the operator before enabling %s component",

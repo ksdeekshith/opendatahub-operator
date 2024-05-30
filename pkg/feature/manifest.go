@@ -18,7 +18,6 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 
 	featurev1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/features/v1"
-	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/deploy"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/metadata/annotations"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/plugins"
 )
@@ -143,14 +142,28 @@ func (k *kustomizeManifest) Process(data any) ([]*unstructured.Unstructured, err
 		}
 	}
 
-	objs, resErr := deploy.GetResources(resMap)
+	objs, resErr := getResources(resMap)
 	if resErr != nil {
 		return nil, resErr
 	}
 	return objs, nil
 }
 
-func (k kustomizeManifest) MarkAsManaged(objects []*unstructured.Unstructured) {
+func getResources(resMap resmap.ResMap) ([]*unstructured.Unstructured, error) {
+	resources := make([]*unstructured.Unstructured, 0, resMap.Size())
+	for _, res := range resMap.Resources() {
+		u := &unstructured.Unstructured{}
+		err := yaml.Unmarshal([]byte(res.MustYaml()), u)
+		if err != nil {
+			return nil, err
+		}
+		resources = append(resources, u)
+	}
+
+	return resources, nil
+}
+
+func (k *kustomizeManifest) MarkAsManaged(objects []*unstructured.Unstructured) {
 	markAsManaged(objects)
 }
 

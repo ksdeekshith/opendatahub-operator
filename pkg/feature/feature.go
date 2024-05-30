@@ -98,7 +98,6 @@ func (f *Feature) applyFeature() error {
 
 	for i := range f.manifests {
 		manifest := f.manifests[i]
-		apply := f.createApplier(manifest)
 
 		objs, processErr := manifest.Process(f.Spec)
 		if processErr != nil {
@@ -109,6 +108,7 @@ func (f *Feature) applyFeature() error {
 			manifest.MarkAsManaged(objs)
 		}
 
+		apply := f.createApplier(manifest)
 		if err := apply(objs); err != nil {
 			return &withConditionReasonError{reason: featurev1.ConditionReason.ApplyManifests, err: err}
 		}

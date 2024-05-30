@@ -28,6 +28,7 @@ import (
 	ocbuildv1 "github.com/openshift/api/build/v1"
 	ocimgv1 "github.com/openshift/api/image/v1"
 	v1 "github.com/openshift/api/operator/v1"
+	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	admv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -57,6 +58,7 @@ import (
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/metadata/labels"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/upgrade"
+	"github.com/opendatahub-io/opendatahub-operator/v2/platform/capabilities"
 )
 
 // DataScienceClusterReconciler reconciles a DataScienceCluster object.
@@ -71,7 +73,8 @@ type DataScienceClusterReconciler struct { //nolint:golint,revive
 
 // DataScienceClusterConfig passing Spec of DSCI for reconcile DataScienceCluster.
 type DataScienceClusterConfig struct { //nolint:golint,revive
-	DSCISpec *dsci.DSCInitializationSpec
+	DSCISpec   *dsci.DSCInitializationSpec
+	DSCIStatus *dsci.DSCInitializationStatus
 }
 
 const (
@@ -165,6 +168,8 @@ func (r *DataScienceClusterReconciler) Reconcile(ctx context.Context, req ctrl.R
 	case 1:
 		dscInitializationSpec := dsciInstances.Items[0].Spec
 		dscInitializationSpec.DeepCopyInto(r.DataScienceCluster.DSCISpec)
+		dscInitializationStatus := dsciInstances.Items[0].Status
+		dscInitializationStatus.DeepCopyInto(r.DataScienceCluster.DSCIStatus)
 	}
 
 	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -177,14 +182,13 @@ func (r *DataScienceClusterReconciler) Reconcile(ctx context.Context, req ctrl.R
 		}
 	} else {
 		r.Log.Info("Finalization DataScienceCluster start deleting instance", "name", instance.Name, "finalizer", finalizerName)
+
+		// TODO(mvp) undeploy odh-platform
+
 		for _, component := range allComponents {
 			if err := component.Cleanup(r.Client, r.DataScienceCluster.DSCISpec); err != nil {
 				return ctrl.Result{}, err
 			}
-		}
-		// testing deletion of auth resources now that default component.Cleanup() sets managementState to "Removed"
-		if capabilityErr := r.configurePlatformCapabilities(ctx, instance, r.DataScienceCluster.DSCISpec); capabilityErr != nil {
-			r.Log.Error(capabilityErr, "failed to remove/configure platform capabilities")
 		}
 
 		if controllerutil.ContainsFinalizer(instance, finalizerName) {
@@ -207,7 +211,7 @@ func (r *DataScienceClusterReconciler) Reconcile(ctx context.Context, req ctrl.R
 			if err := datasciencepipelines.UnmanagedArgoWorkFlowExists(ctx, r.Client); err != nil {
 				message := fmt.Sprintf("Failed upgrade: %v ", err.Error())
 				_, err = status.UpdateWithRetry(ctx, r.Client, instance, func(saved *dsc.DataScienceCluster) {
-					status.SetExistingArgoCondition(&saved.Status.Conditions, status.ArgoWorkflowExist, message)
+					datasciencepipelines.SetExistingArgoCondition(&saved.Status.Conditions, status.ArgoWorkflowExist, message)
 					status.SetErrorCondition(&saved.Status.Conditions, status.ArgoWorkflowExist, message)
 					saved.Status.Phase = status.PhaseError
 				})
@@ -234,15 +238,28 @@ func (r *DataScienceClusterReconciler) Reconcile(ctx context.Context, req ctrl.R
 	// Initialize error list, instead of returning errors after every component is deployed
 	var componentErrors *multierror.Error
 
-	if capabilityErr := r.configurePlatformCapabilities(ctx, instance, r.DataScienceCluster.DSCISpec); capabilityErr != nil {
-		r.Log.Error(capabilityErr, "failed to configure platform capabilities")
-		componentErrors = multierror.Append(componentErrors, capabilityErr)
-	}
+	capabilitiesRegistry := capabilities.NewRegistry(
+		capabilities.NewAuthorization(
+			conditionsv1.IsStatusConditionTrue(r.DataScienceCluster.DSCIStatus.Conditions, status.CapabilityServiceMeshAuthorization),
+		),
+	)
 
 	for _, component := range allComponents {
-		if instance, err = r.reconcileSubComponent(ctx, instance, component); err != nil {
+		if instance, err = r.reconcileSubComponent(ctx, instance, capabilitiesRegistry, component); err != nil {
 			componentErrors = multierror.Append(componentErrors, err)
 		}
+	}
+
+	// TODO can we have no-capability mode at all? should we then just move on
+	if saveErr := capabilitiesRegistry.Save(ctx, r.Client,
+		cluster.OwnedBy(instance, r.Scheme),
+		cluster.InNamespace(r.DataScienceCluster.DSCISpec.ApplicationsNamespace),
+	); saveErr != nil {
+		return ctrl.Result{}, saveErr
+	}
+
+	if configErr := capabilitiesRegistry.ConfigureCapabilities(ctx, r.Client, r.DataScienceCluster.DSCISpec); configErr != nil {
+		return ctrl.Result{}, configErr
 	}
 
 	// Process errors for components
@@ -283,7 +300,7 @@ func (r *DataScienceClusterReconciler) Reconcile(ctx context.Context, req ctrl.R
 }
 
 func (r *DataScienceClusterReconciler) reconcileSubComponent(ctx context.Context, instance *dsc.DataScienceCluster,
-	component components.ComponentInterface,
+	capabilities capabilities.PlatformCapabilities, component components.ComponentInterface,
 ) (*dsc.DataScienceCluster, error) {
 	componentName := component.GetComponentName()
 
@@ -302,7 +319,7 @@ func (r *DataScienceClusterReconciler) reconcileSubComponent(ctx context.Context
 	}
 
 	// Reconcile component
-	err = component.ReconcileComponent(ctx, r.Client, r.Log, instance, r.DataScienceCluster.DSCISpec, instance.Status.InstalledComponents[componentName])
+	err = component.ReconcileComponent(ctx, r.Client, r.Log, instance, r.DataScienceCluster.DSCISpec, instance.Status.InstalledComponents[componentName], capabilities)
 
 	if err != nil {
 		// reconciliation failed: log errors, raise event and update status accordingly
@@ -310,7 +327,7 @@ func (r *DataScienceClusterReconciler) reconcileSubComponent(ctx context.Context
 		instance, _ = status.UpdateWithRetry(ctx, r.Client, instance, func(saved *dsc.DataScienceCluster) {
 			if enabled {
 				if strings.Contains(err.Error(), datasciencepipelines.ArgoWorkflowCRD+" CRD already exists") {
-					status.SetExistingArgoCondition(&saved.Status.Conditions, status.ArgoWorkflowExist, fmt.Sprintf("Component update failed: %v", err))
+					datasciencepipelines.SetExistingArgoCondition(&saved.Status.Conditions, status.ArgoWorkflowExist, fmt.Sprintf("Component update failed: %v", err))
 				} else {
 					status.SetComponentCondition(&saved.Status.Conditions, componentName, status.ReconcileFailed, fmt.Sprintf("Component reconciliation failed: %v", err), corev1.ConditionFalse)
 				}
@@ -445,18 +462,19 @@ func (r *DataScienceClusterReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		Complete(r)
 }
 
+// -> delete DSCI event from kubeserver-api.
 func (r *DataScienceClusterReconciler) watchDataScienceClusterForDSCI(a client.Object) []reconcile.Request {
 	instanceList := &dsc.DataScienceClusterList{}
-	err := r.Client.List(context.TODO(), instanceList)
+	err := r.Client.List(context.TODO(), instanceList) // <- list instances from local cache...
 	if err != nil {
 		return nil
 	}
 	var requestName string
-	switch {
-	case len(instanceList.Items) == 1:
-		requestName = instanceList.Items[0].Name
-	case len(instanceList.Items) == 0:
+	switch len(instanceList.Items) {
+	case 0:
 		requestName = "default-dsc"
+	case 1:
+		requestName = instanceList.Items[0].Name
 	default:
 		return nil
 	}
@@ -475,11 +493,11 @@ func (r *DataScienceClusterReconciler) watchDataScienceClusterResources(a client
 		return nil
 	}
 	var requestName string
-	switch {
-	case len(instanceList.Items) == 1:
-		requestName = instanceList.Items[0].Name
-	case len(instanceList.Items) == 0:
+	switch len(instanceList.Items) {
+	case 0:
 		requestName = "default-dsc"
+	case 1:
+		requestName = instanceList.Items[0].Name
 	default:
 		return nil
 	}

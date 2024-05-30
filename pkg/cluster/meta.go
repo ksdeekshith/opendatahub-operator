@@ -22,6 +22,13 @@ func ApplyMetaOptions(obj metav1.Object, opts ...MetaOptions) error {
 	return nil
 }
 
+func InNamespace(ns string) MetaOptions {
+	return func(obj metav1.Object) error {
+		obj.SetNamespace(ns)
+		return nil
+	}
+}
+
 func WithOwnerReference(ownerReferences ...metav1.OwnerReference) MetaOptions {
 	return func(obj metav1.Object) error {
 		obj.SetOwnerReferences(ownerReferences)

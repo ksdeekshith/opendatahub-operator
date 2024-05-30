@@ -82,7 +82,7 @@ func OperatorUninstall(ctx context.Context, cli client.Client) error {
 	} else if platform == deploy.ManagedRhods {
 		subsName = "addon-managed-odh"
 	}
-	if err := deploy.DeleteExistingSubscription(cli, operatorNs, subsName); err != nil {
+	if err := cluster.DeleteExistingSubscription(cli, operatorNs, subsName); err != nil {
 		return err
 	}
 

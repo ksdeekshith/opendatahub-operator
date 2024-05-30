@@ -10,12 +10,14 @@ import (
 	"github.com/go-logr/logr"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dsciv1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/components"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/deploy"
+	"github.com/opendatahub-io/opendatahub-operator/v2/platform/capabilities"
 )
 
 const modelRegistryNS = "odh-model-registries"
@@ -61,7 +63,7 @@ func (m *ModelRegistry) GetComponentName() string {
 }
 
 func (m *ModelRegistry) ReconcileComponent(_ context.Context, cli client.Client, logger logr.Logger,
-	owner metav1.Object, dscispec *dsciv1.DSCInitializationSpec, _ bool) error {
+	owner metav1.Object, dscispec *dsciv1.DSCInitializationSpec, _ bool, c capabilities.PlatformCapabilities) error {
 	l := m.ConfigComponentLogger(logger, ComponentName, dscispec)
 	var imageParamMap = map[string]string{
 		"IMAGES_MODELREGISTRY_OPERATOR": "RELATED_IMAGE_ODH_MODEL_REGISTRY_OPERATOR_IMAGE",
@@ -99,8 +101,30 @@ func (m *ModelRegistry) ReconcileComponent(_ context.Context, cli client.Client,
 		}
 	}
 
+	if c.Authorization().IsAvailable() && enabled {
+		c.Authorization().ProtectedResources(m.ProtectedResources()...)
+	}
+
 	// Deploy ModelRegistry Operator
 	err = deploy.DeployManifestsFromPath(cli, owner, Path, dscispec.ApplicationsNamespace, m.GetComponentName(), enabled)
 	l.Info("apply manifests done")
 	return err
+}
+
+func (m *ModelRegistry) ProtectedResources() []capabilities.ProtectedResource {
+	return []capabilities.ProtectedResource{
+		{
+			GroupVersionKind: schema.GroupVersionKind{
+				Group:   "modelregistry.opendatahub.io",
+				Version: "v1alpha1",
+				Kind:    "ModelRegistry",
+			},
+			Resources: "modelregistries",
+			WorkloadSelector: map[string]string{
+				"app.kubernetes.io/component": "model-registry",
+			},
+			HostPaths: []string{"status.URL"},
+			Ports:     []string{"8080"},
+		},
+	}
 }

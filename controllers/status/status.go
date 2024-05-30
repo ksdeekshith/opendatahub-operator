@@ -21,8 +21,6 @@ package status
 import (
 	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	corev1 "k8s.io/api/core/v1"
-
-	"github.com/opendatahub-io/opendatahub-operator/v2/components/datasciencepipelines"
 )
 
 // These constants represent the overall Phase as used by .Status.Phase.
@@ -207,15 +205,4 @@ func SetComponentCondition(conditions *[]conditionsv1.Condition, component strin
 func RemoveComponentCondition(conditions *[]conditionsv1.Condition, component string) {
 	condType := component + ReadySuffix
 	conditionsv1.RemoveStatusCondition(conditions, conditionsv1.ConditionType(condType))
-}
-
-func SetExistingArgoCondition(conditions *[]conditionsv1.Condition, reason, message string) {
-	conditionsv1.SetStatusCondition(conditions, conditionsv1.Condition{
-		Type:    CapabilityDSPv2Argo,
-		Status:  corev1.ConditionFalse,
-		Reason:  reason,
-		Message: message,
-	})
-
-	SetComponentCondition(conditions, datasciencepipelines.ComponentName, ReconcileFailed, message, corev1.ConditionFalse)
 }
