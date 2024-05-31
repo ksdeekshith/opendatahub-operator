@@ -23,11 +23,16 @@ type Authorization interface {
 
 // ProtectedResource defines a custom resource type that the component requires capability for.
 type ProtectedResource struct {
+	// GroupVersionKind specifies the group, version, and kind of the resource.
 	schema.GroupVersionKind `json:"gvk,omitempty"`
-	WorkloadSelector        map[string]string `json:"workloadSelector,omitempty"`
-	Resources               string            `json:"resources,omitempty"`
-	HostPaths               []string          `json:"hostPaths,omitempty"`
-	Ports                   []string          `json:"ports,omitempty"`
+	// WorkloadSelector is a map of labels used to select the workload.
+	WorkloadSelector map[string]string `json:"workloadSelector,omitempty"`
+	// Resources is the type of resource being protected, e.g., "pods", "services".
+	Resources string `json:"resources,omitempty"`
+	// HostPaths is a list of host paths associated with the resource.
+	HostPaths []string `json:"hostPaths,omitempty"`
+	// Ports is a list of ports associated with the resource.
+	Ports []string `json:"ports,omitempty"`
 }
 
 // CreateAuthzRoleBinding defines roles which allow platform authorization component to handle protected resources.
