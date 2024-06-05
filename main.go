@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -56,10 +57,12 @@ import (
 	dscicontr "github.com/opendatahub-io/opendatahub-operator/v2/controllers/dscinitialization"
 	"github.com/opendatahub-io/opendatahub-operator/v2/controllers/secretgenerator"
 	"github.com/opendatahub-io/opendatahub-operator/v2/controllers/webhook"
-	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/common"
-	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/deploy"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/logger"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/upgrade"
 )
+
+const controllerNum = 4 // we should keep this updated if we have new controllers to add
 
 var (
 	scheme   = runtime.NewScheme()
@@ -95,7 +98,6 @@ func init() { //nolint:gochecknoinits
 
 func main() { //nolint:funlen
 	var metricsAddr string
-	var enableLeaderElection bool
 	var probeAddr string
 	var dscApplicationsNamespace string
 	var dscMonitoringNamespace string
@@ -104,9 +106,6 @@ func main() { //nolint:funlen
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&dscApplicationsNamespace, "dsc-applications-namespace", "opendatahub", "The namespace where data science cluster"+
 		"applications will be deployed")
 	flag.StringVar(&dscMonitoringNamespace, "dsc-monitoring-namespace", "opendatahub", "The namespace where data science cluster"+
@@ -116,26 +115,13 @@ func main() { //nolint:funlen
 
 	flag.Parse()
 
-	ctrl.SetLogger(common.ConfigLoggers(logmode))
+	ctrl.SetLogger(logger.ConfigLoggers(logmode))
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{ // single pod does not need to have LeaderElection
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
-		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "07ed84f7.opendatahub.io",
-		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
-		// when the Manager ends. This requires the binary to immediately end when the
-		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
-		// speeds up voluntary leader transitions as the new leader don't have to wait
-		// LeaseDuration time first.
-		//
-		// In the default scaffold provided, the program ends immediately after
-		// the manager stops, so would be fine to enable this option. However,
-		// if you are doing or is intended to do any operation such as perform cleanups
-		// after the manager stops then its usage might be unsafe.
-		// LeaderElectionReleaseOnCancel: true,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -147,7 +133,7 @@ func main() { //nolint:funlen
 	if err = (&dscicontr.DSCInitializationReconciler{
 		Client:                mgr.GetClient(),
 		Scheme:                mgr.GetScheme(),
-		Log:                   ctrl.Log.WithName(operatorName).WithName("controllers").WithName("DSCInitialization"),
+		Log:                   logger.LogWithLevel(ctrl.Log.WithName(operatorName).WithName("controllers").WithName("DSCInitialization"), logmode),
 		Recorder:              mgr.GetEventRecorderFor("dscinitialization-controller"),
 		ApplicationsNamespace: dscApplicationsNamespace,
 	}).SetupWithManager(mgr); err != nil {
@@ -158,7 +144,7 @@ func main() { //nolint:funlen
 	if err = (&datascienceclustercontrollers.DataScienceClusterReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
-		Log:    ctrl.Log.WithName(operatorName).WithName("controllers").WithName("DataScienceCluster"),
+		Log:    logger.LogWithLevel(ctrl.Log.WithName(operatorName).WithName("controllers").WithName("DataScienceCluster"), logmode),
 		DataScienceCluster: &datascienceclustercontrollers.DataScienceClusterConfig{
 			DSCISpec: &dsci.DSCInitializationSpec{
 				ApplicationsNamespace: dscApplicationsNamespace,
@@ -173,7 +159,7 @@ func main() { //nolint:funlen
 	if err = (&secretgenerator.SecretGeneratorReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
-		Log:    ctrl.Log.WithName(operatorName).WithName("controllers").WithName("SecretGenerator"),
+		Log:    logger.LogWithLevel(ctrl.Log.WithName(operatorName).WithName("controllers").WithName("SecretGenerator"), logmode),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SecretGenerator")
 		os.Exit(1)
@@ -182,7 +168,7 @@ func main() { //nolint:funlen
 	if err = (&certconfigmapgenerator.CertConfigmapGeneratorReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
-		Log:    ctrl.Log.WithName("controllers").WithName("CertConfigmapGenerator"),
+		Log:    logger.LogWithLevel(ctrl.Log.WithName(operatorName).WithName("controllers").WithName("CertConfigmapGenerator"), logmode),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "CertConfigmapGenerator")
 		os.Exit(1)
@@ -194,6 +180,9 @@ func main() { //nolint:funlen
 		setupLog.Error(err, "error getting config for setup")
 		os.Exit(1)
 	}
+	// uplift default limiataions
+	setupCfg.QPS = rest.DefaultQPS * controllerNum     // 5 * 4 controllers
+	setupCfg.Burst = rest.DefaultBurst * controllerNum // 10 * 4 controllers
 
 	setupClient, err := client.New(setupCfg, client.Options{Scheme: scheme})
 	if err != nil {
@@ -201,22 +190,23 @@ func main() { //nolint:funlen
 		os.Exit(1)
 	}
 	// Get operator platform
-	platform, err := deploy.GetPlatform(setupClient)
+	platform, err := cluster.GetPlatform(setupClient)
 	if err != nil {
 		setupLog.Error(err, "error getting platform")
 		os.Exit(1)
 	}
 	// Check if user opted for disabling DSC configuration
-	_, disableDSCConfig := os.LookupEnv("DISABLE_DSC_CONFIG")
-	if !disableDSCConfig {
+	disableDSCConfig, existDSCConfig := os.LookupEnv("DISABLE_DSC_CONFIG")
+	if existDSCConfig && disableDSCConfig != "false" {
+		setupLog.Info("DSCI auto creation is disabled")
+	} else {
 		var createDefaultDSCIFunc manager.RunnableFunc = func(ctx context.Context) error {
-			err := upgrade.CreateDefaultDSCI(setupClient, platform, dscApplicationsNamespace, dscMonitoringNamespace)
+			err := upgrade.CreateDefaultDSCI(ctx, setupClient, platform, dscApplicationsNamespace, dscMonitoringNamespace)
 			if err != nil {
 				setupLog.Error(err, "unable to create initial setup for the operator")
 			}
 			return err
 		}
-
 		err := mgr.Add(createDefaultDSCIFunc)
 		if err != nil {
 			setupLog.Error(err, "error scheduling DSCI creation")
@@ -224,20 +214,24 @@ func main() { //nolint:funlen
 		}
 	}
 
+	// Cleanup resources from previous v2 releases
 	var cleanExistingResourceFunc manager.RunnableFunc = func(ctx context.Context) error {
 		if err = upgrade.CleanupExistingResource(ctx, setupClient, platform, dscApplicationsNamespace, dscMonitoringNamespace); err != nil {
 			setupLog.Error(err, "unable to perform cleanup")
 		}
 		return err
 	}
+
+	// Create default DSC CR for managed RHODS
+	if platform == cluster.ManagedRhods {
+		if err := upgrade.CreateDefaultDSC(context.TODO(), setupClient); err != nil {
+			setupLog.Error(err, "unable to create default DSC CR by the operator")
+			os.Exit(1)
+		}
+	}
 	err = mgr.Add(cleanExistingResourceFunc)
 	if err != nil {
 		setupLog.Error(err, "error remove deprecated resources from previous version")
-	}
-
-	// Apply update from legacy operator
-	if err = upgrade.UpdateFromLegacyVersion(setupClient, platform, dscApplicationsNamespace, dscMonitoringNamespace); err != nil {
-		setupLog.Error(err, "unable to update from legacy operator version")
 	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

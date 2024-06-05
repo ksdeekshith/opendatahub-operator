@@ -3,19 +3,24 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"time"
 
+	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	authv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/metadata/labels"
 )
 
 // UpdatePodSecurityRolebinding update default rolebinding which is created in applications namespace by manifests
-// being used by different components.
-func UpdatePodSecurityRolebinding(cli client.Client, namespace string, serviceAccountsList ...string) error {
+// being used by different components and SRE monitoring.
+func UpdatePodSecurityRolebinding(ctx context.Context, cli client.Client, namespace string, serviceAccountsList ...string) error {
 	foundRoleBinding := &authv1.RoleBinding{}
-	if err := cli.Get(context.TODO(), client.ObjectKey{Name: namespace, Namespace: namespace}, foundRoleBinding); err != nil {
+	if err := cli.Get(ctx, client.ObjectKey{Name: namespace, Namespace: namespace}, foundRoleBinding); err != nil {
 		return fmt.Errorf("error to get rolebinding %s from namespace %s: %w", namespace, namespace, err)
 	}
 
@@ -30,7 +35,7 @@ func UpdatePodSecurityRolebinding(cli client.Client, namespace string, serviceAc
 		}
 	}
 
-	if err := cli.Update(context.TODO(), foundRoleBinding); err != nil {
+	if err := cli.Update(ctx, foundRoleBinding); err != nil {
 		return fmt.Errorf("error update rolebinding %s with serviceaccount: %w", namespace, err)
 	}
 
@@ -50,7 +55,7 @@ func subjectExistInRoleBinding(subjectList []authv1.Subject, serviceAccountName,
 }
 
 // CreateSecret creates secrets required by dashboard component in downstream.
-func CreateSecret(cli client.Client, name, namespace string, metaOptions ...MetaOptions) error {
+func CreateSecret(ctx context.Context, cli client.Client, name, namespace string, metaOptions ...MetaOptions) error {
 	desiredSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -64,10 +69,10 @@ func CreateSecret(cli client.Client, name, namespace string, metaOptions ...Meta
 	}
 
 	foundSecret := &corev1.Secret{}
-	err := cli.Get(context.TODO(), client.ObjectKey{Name: name, Namespace: namespace}, foundSecret)
+	err := cli.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, foundSecret)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
-			err = cli.Create(context.TODO(), desiredSecret)
+			err = cli.Create(ctx, desiredSecret)
 			if err != nil && !apierrs.IsAlreadyExists(err) {
 				return err
 			}
@@ -82,13 +87,13 @@ func CreateSecret(cli client.Client, name, namespace string, metaOptions ...Meta
 // CreateOrUpdateConfigMap creates a new configmap or updates an existing one.
 // If the configmap already exists, it will be updated with the merged Data and MetaOptions, if any.
 // ConfigMap.ObjectMeta.Name and ConfigMap.ObjectMeta.Namespace are both required, it returns an error otherwise.
-func CreateOrUpdateConfigMap(c client.Client, desiredCfgMap *corev1.ConfigMap, metaOptions ...MetaOptions) error {
+func CreateOrUpdateConfigMap(ctx context.Context, c client.Client, desiredCfgMap *corev1.ConfigMap, metaOptions ...MetaOptions) error {
 	if desiredCfgMap.GetName() == "" || desiredCfgMap.GetNamespace() == "" {
 		return fmt.Errorf("configmap name and namespace must be set")
 	}
 
 	existingCfgMap := &corev1.ConfigMap{}
-	err := c.Get(context.TODO(), client.ObjectKey{
+	err := c.Get(ctx, client.ObjectKey{
 		Name:      desiredCfgMap.Name,
 		Namespace: desiredCfgMap.Namespace,
 	}, existingCfgMap)
@@ -97,7 +102,7 @@ func CreateOrUpdateConfigMap(c client.Client, desiredCfgMap *corev1.ConfigMap, m
 		if applyErr := ApplyMetaOptions(desiredCfgMap, metaOptions...); applyErr != nil {
 			return applyErr
 		}
-		return c.Create(context.TODO(), desiredCfgMap)
+		return c.Create(ctx, desiredCfgMap)
 	} else if err != nil {
 		return err
 	}
@@ -113,7 +118,7 @@ func CreateOrUpdateConfigMap(c client.Client, desiredCfgMap *corev1.ConfigMap, m
 		existingCfgMap.Data[key] = value
 	}
 
-	if updateErr := c.Update(context.TODO(), existingCfgMap); updateErr != nil {
+	if updateErr := c.Update(ctx, existingCfgMap); updateErr != nil {
 		return updateErr
 	}
 
@@ -123,7 +128,7 @@ func CreateOrUpdateConfigMap(c client.Client, desiredCfgMap *corev1.ConfigMap, m
 
 // CreateNamespace creates a namespace and apply metadata.
 // If a namespace already exists, the operation has no effect on it.
-func CreateNamespace(cli client.Client, namespace string, metaOptions ...MetaOptions) (*corev1.Namespace, error) {
+func CreateNamespace(ctx context.Context, cli client.Client, namespace string, metaOptions ...MetaOptions) (*corev1.Namespace, error) {
 	desiredNamespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: namespace,
@@ -135,11 +140,11 @@ func CreateNamespace(cli client.Client, namespace string, metaOptions ...MetaOpt
 	}
 
 	foundNamespace := &corev1.Namespace{}
-	if getErr := cli.Get(context.TODO(), client.ObjectKey{Name: namespace}, foundNamespace); client.IgnoreNotFound(getErr) != nil {
+	if getErr := cli.Get(ctx, client.ObjectKey{Name: namespace}, foundNamespace); client.IgnoreNotFound(getErr) != nil {
 		return nil, getErr
 	}
 
-	createErr := cli.Create(context.TODO(), desiredNamespace)
+	createErr := cli.Create(ctx, desiredNamespace)
 	if apierrs.IsAlreadyExists(createErr) {
 		return foundNamespace, nil
 	}
@@ -171,4 +176,40 @@ func CreateClusterRole(ctx context.Context, cli client.Client, name string, rule
 	}
 
 	return desiredClusterRole, client.IgnoreAlreadyExists(createErr)
+}
+
+// WaitForDeploymentAvailable to check if component deployment from 'namespace' is ready within 'timeout' before apply prometheus rules for the component.
+func WaitForDeploymentAvailable(ctx context.Context, c client.Client, componentName string, namespace string, interval int, timeout int) error {
+	resourceInterval := time.Duration(interval) * time.Second
+	resourceTimeout := time.Duration(timeout) * time.Minute
+
+	return wait.PollUntilContextTimeout(ctx, resourceInterval, resourceTimeout, true, func(ctx context.Context) (bool, error) {
+		componentDeploymentList := &v1.DeploymentList{}
+		err := c.List(ctx, componentDeploymentList, client.InNamespace(namespace), client.HasLabels{labels.ODH.Component(componentName)})
+		if err != nil {
+			return false, fmt.Errorf("error fetching list of deployments: %w", err)
+		}
+
+		fmt.Printf("waiting for %d deployment to be ready for %s\n", len(componentDeploymentList.Items), componentName)
+		for _, deployment := range componentDeploymentList.Items {
+			if deployment.Status.ReadyReplicas != deployment.Status.Replicas {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	})
+}
+
+func CreateWithRetry(ctx context.Context, cli client.Client, obj client.Object, timeoutMin int) error {
+	interval := time.Second * 5 // arbitrary value
+	timeout := time.Duration(timeoutMin) * time.Minute
+
+	return wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
+		err := cli.Create(ctx, obj)
+		if err != nil {
+			return false, nil //nolint:nilerr
+		}
+		return true, nil
+	})
 }

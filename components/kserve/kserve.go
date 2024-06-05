@@ -18,7 +18,6 @@ import (
 	"github.com/opendatahub-io/opendatahub-operator/v2/components"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/deploy"
-	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/monitoring"
 	"github.com/opendatahub-io/opendatahub-operator/v2/platform/capabilities"
 )
 
@@ -109,7 +108,7 @@ func (k *Kserve) ReconcileComponent(ctx context.Context, cli client.Client,
 
 	enabled := k.GetManagementState() == operatorv1.Managed
 	monitoringEnabled := dscispec.Monitoring.ManagementState == operatorv1.Managed
-	platform, err := deploy.GetPlatform(cli)
+	platform, err := cluster.GetPlatform(cli)
 	if err != nil {
 		return err
 	}
@@ -138,19 +137,23 @@ func (k *Kserve) ReconcileComponent(ctx context.Context, cli client.Client,
 		}
 	}
 
+	if err = k.configureServiceMesh(cli, dscispec); err != nil {
+		return fmt.Errorf("failed configuring service mesh while reconciling kserve component. cause: %w", err)
+	}
+
 	if err := deploy.DeployManifestsFromPath(cli, owner, Path, dscispec.ApplicationsNamespace, ComponentName, enabled); err != nil {
 		return fmt.Errorf("failed to apply manifests from %s : %w", Path, err)
 	}
+
+	l.WithValues("Path", Path).Info("apply manifests done for kserve")
 
 	if enabled {
 		if err := k.setupKserveConfig(ctx, cli, dscispec); err != nil {
 			return err
 		}
-	}
-	l.WithValues("Path", Path).Info("apply manifests done for kserve")
-	// For odh-model-controller
-	if enabled {
-		if err := cluster.UpdatePodSecurityRolebinding(cli, dscispec.ApplicationsNamespace, "odh-model-controller"); err != nil {
+
+		// For odh-model-controller
+		if err := cluster.UpdatePodSecurityRolebinding(ctx, cli, dscispec.ApplicationsNamespace, "odh-model-controller"); err != nil {
 			return err
 		}
 		// Update image parameters for odh-model-controller
@@ -169,10 +172,10 @@ func (k *Kserve) ReconcileComponent(ctx context.Context, cli client.Client,
 	}
 	l.WithValues("Path", Path).Info("apply manifests done for odh-model-controller")
 	// CloudService Monitoring handling
-	if platform == deploy.ManagedRhods {
+	if platform == cluster.ManagedRhods {
 		if enabled {
 			// first check if the service is up, so prometheus won't fire alerts when it is just startup
-			if err := monitoring.WaitForDeploymentAvailable(ctx, cli, ComponentName, dscispec.ApplicationsNamespace, 20, 2); err != nil {
+			if err := cluster.WaitForDeploymentAvailable(ctx, cli, ComponentName, dscispec.ApplicationsNamespace, 20, 2); err != nil {
 				return fmt.Errorf("deployment for %s is not ready to server: %w", ComponentName, err)
 			}
 			l.Info("deployment is done, updating monitoing rules")
@@ -184,7 +187,7 @@ func (k *Kserve) ReconcileComponent(ctx context.Context, cli client.Client,
 		l.Info("updating SRE monitoring done")
 	}
 
-	return k.configureServiceMesh(cli, dscispec)
+	return nil
 }
 
 func (k *Kserve) Cleanup(cli client.Client, instance *dsciv1.DSCInitializationSpec) error {

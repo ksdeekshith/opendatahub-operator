@@ -142,13 +142,13 @@ func NewRegistry(authorization AuthorizationCapability) *Registry {
 
 var _ PlatformCapabilities = (*Registry)(nil)
 
-func (r *Registry) Authorization() Authorization {
+func (r *Registry) Authorization() Authorization { //nolint:ireturn //reason TODO figure out return type
 	return &r.authorization
 }
 
 var _ PlatformRegistry = (*Registry)(nil)
 
-func (r *Registry) Save(_ context.Context, cli client.Client, metaOptions ...cluster.MetaOptions) error {
+func (r *Registry) Save(ctx context.Context, cli client.Client, metaOptions ...cluster.MetaOptions) error {
 	// if requested at all
 	platformSettings := make(map[string]string)
 
@@ -166,6 +166,7 @@ func (r *Registry) Save(_ context.Context, cli client.Client, metaOptions ...clu
 
 	// TODO change signature to pass ctx as first param
 	return cluster.CreateOrUpdateConfigMap(
+		ctx,
 		cli,
 		&corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{

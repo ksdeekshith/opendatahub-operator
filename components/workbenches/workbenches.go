@@ -18,7 +18,6 @@ import (
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/deploy"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/metadata/labels"
-	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/monitoring"
 	"github.com/opendatahub-io/opendatahub-operator/v2/platform/capabilities"
 )
 
@@ -58,7 +57,7 @@ func (w *Workbenches) OverrideManifests(platform string) error {
 				defaultKustomizePath = subcomponent.SourcePath
 				defaultKustomizePathSupported = subcomponent.SourcePath
 			}
-			if platform == string(deploy.ManagedRhods) || platform == string(deploy.SelfManagedRhods) {
+			if platform == string(cluster.ManagedRhods) || platform == string(cluster.SelfManagedRhods) {
 				notebookImagesPathSupported = filepath.Join(deploy.DefaultManifestPath, "jupyterhub", defaultKustomizePathSupported)
 			} else {
 				notebookImagesPath = filepath.Join(deploy.DefaultManifestPath, DependentComponentName, defaultKustomizePath)
@@ -110,7 +109,7 @@ func (w *Workbenches) ReconcileComponent(ctx context.Context, cli client.Client,
 	// Create rhods-notebooks namespace in managed platforms
 	enabled := w.GetManagementState() == operatorv1.Managed
 	monitoringEnabled := dscispec.Monitoring.ManagementState == operatorv1.Managed
-	platform, err := deploy.GetPlatform(cli)
+	platform, err := cluster.GetPlatform(cli)
 	if err != nil {
 		return err
 	}
@@ -124,16 +123,16 @@ func (w *Workbenches) ReconcileComponent(ctx context.Context, cli client.Client,
 				return err
 			}
 		}
-		if platform == deploy.SelfManagedRhods || platform == deploy.ManagedRhods {
+		if platform == cluster.SelfManagedRhods || platform == cluster.ManagedRhods {
 			// Intentionally leaving the ownership unset for this namespace.
 			// Specifying this label triggers its deletion when the operator is uninstalled.
-			_, err := cluster.CreateNamespace(cli, "rhods-notebooks", cluster.WithLabels(labels.ODH.OwnedNamespace, "true"))
+			_, err := cluster.CreateNamespace(ctx, cli, "rhods-notebooks", cluster.WithLabels(labels.ODH.OwnedNamespace, "true"))
 			if err != nil {
 				return err
 			}
 		}
 		// Update Default rolebinding
-		err = cluster.UpdatePodSecurityRolebinding(cli, dscispec.ApplicationsNamespace, "notebook-controller-service-account")
+		err = cluster.UpdatePodSecurityRolebinding(ctx, cli, dscispec.ApplicationsNamespace, "notebook-controller-service-account")
 		if err != nil {
 			return err
 		}
@@ -146,7 +145,7 @@ func (w *Workbenches) ReconcileComponent(ctx context.Context, cli client.Client,
 	// Update image parameters for nbc in downstream
 	if enabled {
 		if (dscispec.DevFlags == nil || dscispec.DevFlags.ManifestsUri == "") && (w.DevFlags == nil || len(w.DevFlags.Manifests) == 0) {
-			if platform == deploy.ManagedRhods || platform == deploy.SelfManagedRhods {
+			if platform == cluster.ManagedRhods || platform == cluster.SelfManagedRhods {
 				// for kf-notebook-controller image
 				if err := deploy.ApplyParams(notebookControllerPath, imageParamMap, false); err != nil {
 					return fmt.Errorf("failed to update image %s: %w", notebookControllerPath, err)
@@ -160,7 +159,7 @@ func (w *Workbenches) ReconcileComponent(ctx context.Context, cli client.Client,
 	}
 
 	var manifestsPath string
-	if platform == deploy.OpenDataHub || platform == "" {
+	if platform == cluster.OpenDataHub || platform == "" {
 		// only for ODH after transit to kubeflow repo
 		if err = deploy.DeployManifestsFromPath(cli, owner,
 			kfnotebookControllerPath,
@@ -180,11 +179,11 @@ func (w *Workbenches) ReconcileComponent(ctx context.Context, cli client.Client,
 	}
 	l.WithValues("Path", manifestsPath).Info("apply manifests done notebook image")
 	// CloudService Monitoring handling
-	if platform == deploy.ManagedRhods {
+	if platform == cluster.ManagedRhods {
 		if enabled {
 			// first check if the service is up, so prometheus wont fire alerts when it is just startup
 			// only 1 replica set timeout to 1min
-			if err := monitoring.WaitForDeploymentAvailable(ctx, cli, ComponentName, dscispec.ApplicationsNamespace, 10, 1); err != nil {
+			if err := cluster.WaitForDeploymentAvailable(ctx, cli, ComponentName, dscispec.ApplicationsNamespace, 10, 1); err != nil {
 				return fmt.Errorf("deployments for %s are not ready to server: %w", ComponentName, err)
 			}
 			l.Info("deployment is done, updating monitoring rules")

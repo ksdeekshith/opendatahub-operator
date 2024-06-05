@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dsciv1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
-	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/common"
+	ctrlogger "github.com/opendatahub-io/opendatahub-operator/v2/pkg/logger"
 	"github.com/opendatahub-io/opendatahub-operator/v2/platform/capabilities"
 )
 
@@ -65,9 +65,9 @@ type ManifestsConfig struct {
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=1
 	URI string `json:"uri,omitempty"`
 
-	// contextDir is the relative path to the folder containing manifests in a repository
+	// contextDir is the relative path to the folder containing manifests in a repository, default value "manifests"
 	// +optional
-	// +kubebuilder:default:=""
+	// +kubebuilder:default:="manifests"
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=2
 	ContextDir string `json:"contextDir,omitempty"`
 
@@ -92,7 +92,7 @@ type ComponentInterface interface {
 // extend origal ConfigLoggers to include component name.
 func (c *Component) ConfigComponentLogger(logger logr.Logger, component string, dscispec *dsciv1.DSCInitializationSpec) logr.Logger {
 	if dscispec.DevFlags != nil {
-		return common.ConfigLoggers(dscispec.DevFlags.LogMode).WithName("DSC.Components." + component)
+		return ctrlogger.ConfigLoggers(dscispec.DevFlags.LogMode).WithName("DSC.Components." + component)
 	}
 	return logger.WithName("DSC.Components." + component)
 }

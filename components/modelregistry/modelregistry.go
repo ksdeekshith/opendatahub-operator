@@ -62,7 +62,7 @@ func (m *ModelRegistry) GetComponentName() string {
 	return ComponentName
 }
 
-func (m *ModelRegistry) ReconcileComponent(_ context.Context, cli client.Client, logger logr.Logger,
+func (m *ModelRegistry) ReconcileComponent(ctx context.Context, cli client.Client, logger logr.Logger,
 	owner metav1.Object, dscispec *dsciv1.DSCInitializationSpec, _ bool, c capabilities.PlatformCapabilities) error {
 	l := m.ConfigComponentLogger(logger, ComponentName, dscispec)
 	var imageParamMap = map[string]string{
@@ -72,7 +72,7 @@ func (m *ModelRegistry) ReconcileComponent(_ context.Context, cli client.Client,
 	}
 	enabled := m.GetManagementState() == operatorv1.Managed
 
-	platform, err := deploy.GetPlatform(cli)
+	platform, err := cluster.GetPlatform(cli)
 	if err != nil {
 		return err
 	}
@@ -95,7 +95,7 @@ func (m *ModelRegistry) ReconcileComponent(_ context.Context, cli client.Client,
 		// Create odh-model-registries namespace
 		// We do not delete this namespace even when ModelRegistry is Removed or when operator is uninstalled.
 		namespacedSMCP := fmt.Sprintf("%s/%s", dscispec.ServiceMesh.ControlPlane.Namespace, dscispec.ServiceMesh.ControlPlane.Name)
-		_, err := cluster.CreateNamespace(cli, modelRegistryNS, cluster.WithAnnotations("service-mesh.opendatahub.io/member-of", namespacedSMCP))
+		_, err := cluster.CreateNamespace(ctx, cli, modelRegistryNS, cluster.WithAnnotations("service-mesh.opendatahub.io/member-of", namespacedSMCP))
 		if err != nil {
 			return err
 		}
@@ -107,8 +107,19 @@ func (m *ModelRegistry) ReconcileComponent(_ context.Context, cli client.Client,
 
 	// Deploy ModelRegistry Operator
 	err = deploy.DeployManifestsFromPath(cli, owner, Path, dscispec.ApplicationsNamespace, m.GetComponentName(), enabled)
+	if err != nil {
+		return err
+	}
 	l.Info("apply manifests done")
-	return err
+
+	// Create additional model registry resources, componentEnabled=true because these extras are never deleted!
+	err = deploy.DeployManifestsFromPath(cli, owner, Path+"/extras", dscispec.ApplicationsNamespace, m.GetComponentName(), true)
+	if err != nil {
+		return err
+	}
+	l.Info("apply extra manifests done")
+
+	return nil
 }
 
 func (m *ModelRegistry) ProtectedResources() []capabilities.ProtectedResource {

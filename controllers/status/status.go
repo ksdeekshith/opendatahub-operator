@@ -206,3 +206,13 @@ func RemoveComponentCondition(conditions *[]conditionsv1.Condition, component st
 	condType := component + ReadySuffix
 	conditionsv1.RemoveStatusCondition(conditions, conditionsv1.ConditionType(condType))
 }
+
+// SetGeneralCondition function to patch any type of condition.
+func SetGeneralCondition(conditions *[]conditionsv1.Condition, conditionType string, reason string, message string, status corev1.ConditionStatus) {
+	conditionsv1.SetStatusCondition(conditions, conditionsv1.Condition{
+		Type:    conditionsv1.ConditionType(conditionType),
+		Status:  status,
+		Reason:  reason,
+		Message: message,
+	})
+}

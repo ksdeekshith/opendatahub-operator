@@ -17,7 +17,6 @@ import (
 	"github.com/opendatahub-io/opendatahub-operator/v2/components"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/deploy"
-	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/monitoring"
 	"github.com/opendatahub-io/opendatahub-operator/v2/platform/capabilities"
 )
 
@@ -97,7 +96,7 @@ func (m *ModelMeshServing) ReconcileComponent(ctx context.Context,
 
 	enabled := m.GetManagementState() == operatorv1.Managed
 	monitoringEnabled := dscispec.Monitoring.ManagementState == operatorv1.Managed
-	platform, err := deploy.GetPlatform(cli)
+	platform, err := cluster.GetPlatform(cli)
 	if err != nil {
 		return err
 	}
@@ -111,7 +110,7 @@ func (m *ModelMeshServing) ReconcileComponent(ctx context.Context,
 			}
 		}
 
-		if err := cluster.UpdatePodSecurityRolebinding(cli, dscispec.ApplicationsNamespace,
+		if err := cluster.UpdatePodSecurityRolebinding(ctx, cli, dscispec.ApplicationsNamespace,
 			"modelmesh",
 			"modelmesh-controller",
 			"odh-prometheus-operator",
@@ -132,7 +131,7 @@ func (m *ModelMeshServing) ReconcileComponent(ctx context.Context,
 	l.WithValues("Path", Path).Info("apply manifests done for modelmesh")
 	// For odh-model-controller
 	if enabled {
-		if err := cluster.UpdatePodSecurityRolebinding(cli, dscispec.ApplicationsNamespace,
+		if err := cluster.UpdatePodSecurityRolebinding(ctx, cli, dscispec.ApplicationsNamespace,
 			"odh-model-controller"); err != nil {
 			return err
 		}
@@ -152,10 +151,10 @@ func (m *ModelMeshServing) ReconcileComponent(ctx context.Context,
 
 	l.WithValues("Path", DependentPath).Info("apply manifests done for odh-model-controller")
 	// CloudService Monitoring handling
-	if platform == deploy.ManagedRhods {
+	if platform == cluster.ManagedRhods {
 		if enabled {
 			// first check if service is up, so prometheus won't fire alerts when it is just startup
-			if err := monitoring.WaitForDeploymentAvailable(ctx, cli, ComponentName, dscispec.ApplicationsNamespace, 20, 2); err != nil {
+			if err := cluster.WaitForDeploymentAvailable(ctx, cli, ComponentName, dscispec.ApplicationsNamespace, 20, 2); err != nil {
 				return fmt.Errorf("deployment for %s is not ready to server: %w", ComponentName, err)
 			}
 			l.Info("deployment is done, updating monitoring rules")

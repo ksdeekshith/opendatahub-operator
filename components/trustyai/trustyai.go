@@ -14,14 +14,15 @@ import (
 
 	dsciv1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/components"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/deploy"
-	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/monitoring"
 	"github.com/opendatahub-io/opendatahub-operator/v2/platform/capabilities"
 )
 
 var (
-	ComponentName = "trustyai"
-	Path          = deploy.DefaultManifestPath + "/" + "trustyai-service-operator/base"
+	ComponentName     = "trustyai"
+	ComponentPathName = "trustyai-service-operator"
+	Path              = deploy.DefaultManifestPath + "/" + ComponentPathName + "/base"
 )
 
 // Verifies that TrustyAI implements ComponentInterface.
@@ -37,7 +38,7 @@ func (t *TrustyAI) OverrideManifests(_ string) error {
 	// If devflags are set, update default manifests path
 	if len(t.DevFlags.Manifests) != 0 {
 		manifestConfig := t.DevFlags.Manifests[0]
-		if err := deploy.DownloadManifests(ComponentName, manifestConfig); err != nil {
+		if err := deploy.DownloadManifests(ComponentPathName, manifestConfig); err != nil {
 			return err
 		}
 		// If overlay is defined, update paths
@@ -45,7 +46,7 @@ func (t *TrustyAI) OverrideManifests(_ string) error {
 		if manifestConfig.SourcePath != "" {
 			defaultKustomizePath = manifestConfig.SourcePath
 		}
-		Path = filepath.Join(deploy.DefaultManifestPath, ComponentName, defaultKustomizePath)
+		Path = filepath.Join(deploy.DefaultManifestPath, ComponentPathName, defaultKustomizePath)
 	}
 	return nil
 }
@@ -65,7 +66,7 @@ func (t *TrustyAI) ReconcileComponent(ctx context.Context, cli client.Client, lo
 	enabled := t.GetManagementState() == operatorv1.Managed
 	monitoringEnabled := dscispec.Monitoring.ManagementState == operatorv1.Managed
 
-	platform, err := deploy.GetPlatform(cli)
+	platform, err := cluster.GetPlatform(cli)
 	if err != nil {
 		return err
 	}
@@ -90,9 +91,9 @@ func (t *TrustyAI) ReconcileComponent(ctx context.Context, cli client.Client, lo
 	l.Info("apply manifests done")
 
 	// CloudService Monitoring handling
-	if platform == deploy.ManagedRhods {
+	if platform == cluster.ManagedRhods {
 		if enabled {
-			if err := monitoring.WaitForDeploymentAvailable(ctx, cli, ComponentName, dscispec.ApplicationsNamespace, 10, 1); err != nil {
+			if err := cluster.WaitForDeploymentAvailable(ctx, cli, ComponentName, dscispec.ApplicationsNamespace, 10, 1); err != nil {
 				return fmt.Errorf("deployment for %s is not ready to server: %w", ComponentName, err)
 			}
 			l.Info("deployment is done, updating monitoring rules")
