@@ -124,11 +124,12 @@ func (m *ModelRegistry) ProtectedResources() []capabilities.ProtectedResource {
 				Kind:    "ModelRegistry",
 			},
 			Resources: "modelregistries",
+			HostPaths: []string{"status.URL"},
+
 			WorkloadSelector: map[string]string{
 				"app.kubernetes.io/component": "model-registry",
 			},
-			HostPaths: []string{"status.URL"},
-			Ports:     []string{"8080"},
+			Ports: []string{"8080"},
 		},
 	}
 }
