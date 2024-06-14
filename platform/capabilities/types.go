@@ -123,7 +123,7 @@ func (r *Registry) definePlatform() feature.FeaturesProvider {
 	return func(handler *feature.FeaturesHandler) error {
 		createControllerErr := feature.CreateFeature("deploy-odh-platform").
 			For(handler).
-			ManifestSource(os.DirFS(".")). // tmp, unused
+			ManifestsLocation(os.DirFS(".")). // tmp, unused
 			Manifests(
 				path.Join("/opt/manifests/platform/default"),
 			).

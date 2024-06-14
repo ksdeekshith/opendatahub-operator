@@ -133,7 +133,7 @@ metadata:
 			createCfgMapErr := feature.CreateFeature("create-cfg-map").
 				For(handler).
 				UsingConfig(envTest.Config).
-				ManifestSource(os.DirFS(tempDir)).
+				ManifestsLocation(os.DirFS(tempDir)).
 				Manifests(path.Join("fixtures", fixtures.BaseDir, "fake-kust-dir")).
 				Load()
 
