@@ -69,6 +69,7 @@ func (d *DataSciencePipelines) ReconcileComponent(ctx context.Context,
 	logger logr.Logger,
 	owner metav1.Object,
 	dscispec *dsciv1.DSCInitializationSpec,
+	platform cluster.Platform,
 	_ bool,
 	_ capabilities.PlatformCapabilities,
 ) error {
@@ -95,14 +96,10 @@ func (d *DataSciencePipelines) ReconcileComponent(ctx context.Context,
 	enabled := d.GetManagementState() == operatorv1.Managed
 	monitoringEnabled := dscispec.Monitoring.ManagementState == operatorv1.Managed
 
-	platform, err := cluster.GetPlatform(cli)
-	if err != nil {
-		return err
-	}
 	if enabled {
 		if d.DevFlags != nil {
 			// Download manifests and update paths
-			if err = d.OverrideManifests(string(platform)); err != nil {
+			if err := d.OverrideManifests(string(platform)); err != nil {
 				return err
 			}
 		}
@@ -124,7 +121,7 @@ func (d *DataSciencePipelines) ReconcileComponent(ctx context.Context,
 	if platform == cluster.OpenDataHub || platform == "" {
 		manifestsPath = filepath.Join(OverlayPath, "odh")
 	}
-	if err = deploy.DeployManifestsFromPath(cli, owner, manifestsPath, dscispec.ApplicationsNamespace, ComponentName, enabled); err != nil {
+	if err := deploy.DeployManifestsFromPath(cli, owner, manifestsPath, dscispec.ApplicationsNamespace, ComponentName, enabled); err != nil {
 		return err
 	}
 	l.Info("apply manifests done")
@@ -143,7 +140,7 @@ func (d *DataSciencePipelines) ReconcileComponent(ctx context.Context,
 		if err := d.UpdatePrometheusConfig(cli, enabled && monitoringEnabled, ComponentName); err != nil {
 			return err
 		}
-		if err = deploy.DeployManifestsFromPath(cli, owner,
+		if err := deploy.DeployManifestsFromPath(cli, owner,
 			filepath.Join(deploy.DefaultManifestPath, "monitoring", "prometheus", "apps"),
 			dscispec.Monitoring.Namespace,
 			"prometheus", true); err != nil {

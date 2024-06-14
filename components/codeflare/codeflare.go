@@ -62,6 +62,7 @@ func (c *CodeFlare) GetComponentName() string {
 func (c *CodeFlare) ReconcileComponent(
 	ctx context.Context, cli client.Client, logger logr.Logger,
 	owner metav1.Object, dscispec *dsciv1.DSCInitializationSpec,
+	platform cluster.Platform,
 	_ bool, _ capabilities.PlatformCapabilities) error {
 	l := c.ConfigComponentLogger(logger, ComponentName, dscispec)
 	var imageParamMap = map[string]string{
@@ -71,14 +72,11 @@ func (c *CodeFlare) ReconcileComponent(
 
 	enabled := c.GetManagementState() == operatorv1.Managed
 	monitoringEnabled := dscispec.Monitoring.ManagementState == operatorv1.Managed
-	platform, err := cluster.GetPlatform(cli)
-	if err != nil {
-		return err
-	}
+
 	if enabled {
 		if c.DevFlags != nil {
 			// Download manifests and update paths
-			if err = c.OverrideManifests(string(platform)); err != nil {
+			if err := c.OverrideManifests(string(platform)); err != nil {
 				return err
 			}
 		}
@@ -120,10 +118,10 @@ func (c *CodeFlare) ReconcileComponent(
 		}
 
 		// inject prometheus codeflare*.rules in to /opt/manifests/monitoring/prometheus/prometheus-configs.yaml
-		if err = c.UpdatePrometheusConfig(cli, enabled && monitoringEnabled, ComponentName); err != nil {
+		if err := c.UpdatePrometheusConfig(cli, enabled && monitoringEnabled, ComponentName); err != nil {
 			return err
 		}
-		if err = deploy.DeployManifestsFromPath(cli, owner,
+		if err := deploy.DeployManifestsFromPath(cli, owner,
 			filepath.Join(deploy.DefaultManifestPath, "monitoring", "prometheus", "apps"),
 			dscispec.Monitoring.Namespace,
 			"prometheus", true); err != nil {

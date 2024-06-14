@@ -96,7 +96,7 @@ func (k *Kserve) GetComponentName() string {
 }
 
 func (k *Kserve) ReconcileComponent(ctx context.Context, cli client.Client,
-	logger logr.Logger, owner metav1.Object, dscispec *dsciv1.DSCInitializationSpec, _ bool, _ capabilities.PlatformCapabilities) error {
+	logger logr.Logger, owner metav1.Object, dscispec *dsciv1.DSCInitializationSpec, platform cluster.Platform, _ bool, _ capabilities.PlatformCapabilities) error {
 	l := k.ConfigComponentLogger(logger, ComponentName, dscispec)
 	// paramMap for Kserve to use.
 	var imageParamMap = map[string]string{}
@@ -108,10 +108,6 @@ func (k *Kserve) ReconcileComponent(ctx context.Context, cli client.Client,
 
 	enabled := k.GetManagementState() == operatorv1.Managed
 	monitoringEnabled := dscispec.Monitoring.ManagementState == operatorv1.Managed
-	platform, err := cluster.GetPlatform(cli)
-	if err != nil {
-		return err
-	}
 
 	if !enabled {
 		if err := k.removeServerlessFeatures(dscispec); err != nil {
@@ -124,7 +120,7 @@ func (k *Kserve) ReconcileComponent(ctx context.Context, cli client.Client,
 		}
 		if k.DevFlags != nil {
 			// Download manifests and update paths
-			if err = k.OverrideManifests(string(platform)); err != nil {
+			if err := k.OverrideManifests(string(platform)); err != nil {
 				return err
 			}
 		}
@@ -137,7 +133,7 @@ func (k *Kserve) ReconcileComponent(ctx context.Context, cli client.Client,
 		}
 	}
 
-	if err = k.configureServiceMesh(cli, dscispec); err != nil {
+	if err := k.configureServiceMesh(cli, dscispec); err != nil {
 		return fmt.Errorf("failed configuring service mesh while reconciling kserve component. cause: %w", err)
 	}
 
