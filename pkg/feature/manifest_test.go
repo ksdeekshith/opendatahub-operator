@@ -148,7 +148,7 @@ metadata:
 data:
   key: value
 `
-			data := feature.Spec{
+			data := feature.Feature{
 				TargetNamespace: "kust-ns",
 			}
 

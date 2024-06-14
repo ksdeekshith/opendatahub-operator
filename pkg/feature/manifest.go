@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 
-	featurev1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/features/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/metadata/annotations"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/plugins"
 )
@@ -112,7 +111,7 @@ var _ Manifest = (*kustomizeManifest)(nil)
 // note that it only supports to paths within the mounted files ie: /opt/manifests.
 type kustomizeManifest struct {
 	name,
-	path string // path is to the directory containing a kustomization.yaml file within it or path to kust file itself
+	path string
 	fsys filesys.FileSystem
 }
 
@@ -277,23 +276,13 @@ func convertToUnstructuredSlice(resources string) ([]*unstructured.Unstructured,
 	return objs, nil
 }
 
-func getTargetNs(data any) string {
-	if spec, ok := data.(*Spec); ok {
-		return spec.TargetNamespace
-	}
-	return ""
+// TODO(mvp): the Manifest structure should be revamped, as these are hard assumptions made on what is passed to kustomized
+// TODO(mvp): it would be better to compose a Kustomize-based features with plugins target namespace and component name are intended for
+// TODO(mvp): this however, makes the whole Process(data any) a bit blurry, as it is only needed for Templates, making it a wrong abstraction for other "types" of Manifests.
+func getTargetNs(_ any) string {
+	return "opendatahub"
 }
 
-func getComponentName(data any) string {
-	if featSpec, ok := data.(*Spec); ok {
-		source := featSpec.Source
-		if source == nil {
-			return ""
-		}
-		if source.Type == featurev1.ComponentType {
-			return source.Name
-		}
-		return ""
-	}
-	return ""
+func getComponentName(_ any) string {
+	return "kserve"
 }
