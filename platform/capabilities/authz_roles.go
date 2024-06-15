@@ -15,11 +15,10 @@ import (
 const roleName = "platform-protected-resources-watcher"
 
 // CreateOrUpdateAuthzRoleBinding defines roles which allow platform authorization component to handle protected resources.
-// TODO(mvp) Remove counterpart - implement deletion roles
-// Since we have all in one registry, component split does not make sense anymore nor it's actually needed
+// TODO: ? Since we have all in one registry, component split does not make sense anymore nor it's actually needed
 // TODO(mvp) tests.
-func CreateOrUpdateAuthzRoleBinding(ctx context.Context, cli client.Client, protectedResources []ProtectedResource) error {
-	clusterRoleBinding, err := createAuthzRoleBinding(ctx, cli, protectedResources, roleName)
+func CreateOrUpdateAuthzRoleBinding(ctx context.Context, cli client.Client, protectedResources []ProtectedResource, metaOptions ...cluster.MetaOptions) error {
+	clusterRoleBinding, err := createAuthzRoleBinding(ctx, cli, protectedResources, roleName, metaOptions...)
 	if err != nil {
 		return err
 	}
@@ -42,6 +41,7 @@ func CreateOrUpdateAuthzRoleBinding(ctx context.Context, cli client.Client, prot
 }
 
 // TryDeleteAuthzRoleBinding attempts to remove created authz role/bindings but does not fail if these are not existing in the cluster.
+// TODO: Don't create the RoleBinding first then delete it...
 func TryDeleteAuthzRoleBinding(ctx context.Context, cli client.Client, protectedResources []ProtectedResource) error {
 	clusterRoleBinding, err := createAuthzRoleBinding(ctx, cli, protectedResources, roleName)
 	if err != nil {
@@ -55,7 +55,7 @@ func TryDeleteAuthzRoleBinding(ctx context.Context, cli client.Client, protected
 	return client.IgnoreNotFound(cli.Delete(ctx, clusterRoleBinding))
 }
 
-func createAuthzRoleBinding(ctx context.Context, cli client.Client, protectedResources []ProtectedResource, roleName string) (*rbacv1.ClusterRoleBinding, error) {
+func createAuthzRoleBinding(ctx context.Context, cli client.Client, protectedResources []ProtectedResource, roleName string, metaOptions ...cluster.MetaOptions) (*rbacv1.ClusterRoleBinding, error) {
 	apiGroups := make([]string, 0)
 	resources := make([]string, 0)
 	for _, resource := range protectedResources {
@@ -71,7 +71,7 @@ func createAuthzRoleBinding(ctx context.Context, cli client.Client, protectedRes
 		},
 	}
 
-	if _, roleErr := cluster.CreateClusterRole(ctx, cli, roleName, rules); roleErr != nil {
+	if _, roleErr := cluster.CreateClusterRole(ctx, cli, roleName, rules, metaOptions...); roleErr != nil {
 		return nil, fmt.Errorf("failed creating cluster roles: %w", roleErr)
 	}
 

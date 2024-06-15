@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -56,21 +57,19 @@ func (a *AuthorizationCapability) asJSON() ([]byte, error) {
 
 var _ Handler = (*AuthorizationCapability)(nil)
 
-// TODO: has been configured sounds like Configure has been called.. shouldBeConfigured? or Setup/Tear dowen instead?
 func (a *AuthorizationCapability) IsRequired() bool {
 	return len(a.protectedResources) > 0
 }
 
 // Configure enables the Authorization capability and component-specific configuration through registered hooks.
-func (a *AuthorizationCapability) Configure(ctx context.Context, cli client.Client) error {
+func (a *AuthorizationCapability) Configure(ctx context.Context, cli client.Client, metaOptions ...cluster.MetaOptions) error {
 	if a.IsRequired() {
-		return CreateOrUpdateAuthzRoleBinding(ctx, cli, a.protectedResources)
+		return CreateOrUpdateAuthzRoleBinding(ctx, cli, a.protectedResources, metaOptions...)
 	}
 
 	return TryDeleteAuthzRoleBinding(ctx, cli, a.protectedResources)
 }
 
-func (a *AuthorizationCapability) Remove(_ context.Context, _ client.Client) error {
-	// return TryDeleteAuthzRoleBinding(ctx, cli, a.protectedResources)
-	return nil
+func (a *AuthorizationCapability) Remove(ctx context.Context, cli client.Client) error {
+	return TryDeleteAuthzRoleBinding(ctx, cli, a.protectedResources)
 }

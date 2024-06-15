@@ -22,7 +22,7 @@ import (
 // TODO(mvp) rename - what are we going to use it for? adding stuff for capability?
 type Handler interface {
 	IsRequired() bool
-	Configure(ctx context.Context, cli client.Client) error
+	Configure(ctx context.Context, cli client.Client, metaOptions ...cluster.MetaOptions) error
 	Remove(ctx context.Context, cli client.Client) error
 }
 
@@ -32,7 +32,7 @@ type Availability interface {
 
 type PlatformRegistry interface {
 	Save(c context.Context, cli client.Client, metaOptions ...cluster.MetaOptions) error
-	ConfigureCapabilities(context.Context, client.Client, *dsciv1.DSCInitializationSpec) error
+	ConfigureCapabilities(context.Context, client.Client, *dsciv1.DSCInitializationSpec, ...cluster.MetaOptions) error
 	// RemoveCapabilities(context.Context, client.Client, *dsciv1.DSCInitializationSpec) error
 	// authz: apply authorino setup
 	// TODO(after-mvp): when KServe onboarded move authz setup from DSCI controller here
@@ -49,7 +49,7 @@ type Registry struct {
 }
 
 // TODO: include OwnedBy for DSC clean up, both Registry and Handler.
-func (r *Registry) ConfigureCapabilities(ctx context.Context, cli client.Client, dsciSpec *dsciv1.DSCInitializationSpec) error {
+func (r *Registry) ConfigureCapabilities(ctx context.Context, cli client.Client, dsciSpec *dsciv1.DSCInitializationSpec, metaOptions ...cluster.MetaOptions) error {
 	// iterate over all handlers and configure
 
 	handlers := []Handler{&r.authorization}
@@ -67,7 +67,7 @@ func (r *Registry) ConfigureCapabilities(ctx context.Context, cli client.Client,
 	// TODO(mvp): multi error
 	configure := func(handlers ...Handler) error {
 		for _, handler := range handlers {
-			err := handler.Configure(ctx, cli)
+			err := handler.Configure(ctx, cli, metaOptions...)
 			if err != nil {
 				return err
 			}
@@ -98,6 +98,13 @@ func (r *Registry) ConfigureCapabilities(ctx context.Context, cli client.Client,
 		if err != nil {
 			return err
 		}
+
+		// TODO: instead of a defined configure/remove phase.. should we simply call remove if !HasBeenConfigured incase it once was?
+		err = configure(handlers...)
+		if err != nil {
+			return err
+		}
+
 	} else {
 		if err := authInitializer.Delete(); err != nil {
 			return err
@@ -108,12 +115,7 @@ func (r *Registry) ConfigureCapabilities(ctx context.Context, cli client.Client,
 		if err := remove(handlers...); err != nil {
 			return err
 		}
-	}
 
-	// TODO: instead of a defined configure/remove phase.. should we simply call remove if !HasBeenConfigured incase it once was?
-	err = configure(handlers...)
-	if err != nil {
-		return err
 	}
 
 	return nil
