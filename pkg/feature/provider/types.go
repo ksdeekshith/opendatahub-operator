@@ -1,4 +1,3 @@
-//nolint:ireturn //reason: returns T[any] generic type
 package provider
 
 import (
@@ -42,12 +41,12 @@ var _ DataProvider[any] = (*DataProviderWithDefault[any])(nil)
 var _ Defaulter[any] = (*DataProviderWithDefault[any])(nil)
 
 // Get returns Value() of Defaulter and ensures DataProviderWithDefault can be used as DataProviderFunc.
-func (d DataProviderWithDefault[T]) Get(_ context.Context, _ client.Client) (T, error) {
+func (d DataProviderWithDefault[T]) Get(_ context.Context, _ client.Client) (T, error) { //nolint:ireturn //reason: returns T[any] generic type
 	return d.value, nil
 }
 
 // Value returns actual value stored by the provider.
-func (d DataProviderWithDefault[T]) Value() T {
+func (d DataProviderWithDefault[T]) Value() T { //nolint:ireturn //reason: returns T[any] generic type
 	return d.value
 }
 

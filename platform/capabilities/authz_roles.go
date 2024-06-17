@@ -55,7 +55,8 @@ func TryDeleteAuthzRoleBinding(ctx context.Context, cli client.Client, protected
 	return client.IgnoreNotFound(cli.Delete(ctx, clusterRoleBinding))
 }
 
-func createAuthzRoleBinding(ctx context.Context, cli client.Client, protectedResources []ProtectedResource, roleName string, metaOptions ...cluster.MetaOptions) (*rbacv1.ClusterRoleBinding, error) {
+func createAuthzRoleBinding(ctx context.Context, cli client.Client, protectedResources []ProtectedResource,
+	roleName string, metaOptions ...cluster.MetaOptions) (*rbacv1.ClusterRoleBinding, error) {
 	apiGroups := make([]string, 0)
 	resources := make([]string, 0)
 	for _, resource := range protectedResources {

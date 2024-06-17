@@ -104,7 +104,6 @@ func (r *Registry) ConfigureCapabilities(ctx context.Context, cli client.Client,
 		if err != nil {
 			return err
 		}
-
 	} else {
 		if err := authInitializer.Delete(); err != nil {
 			return err
@@ -115,7 +114,6 @@ func (r *Registry) ConfigureCapabilities(ctx context.Context, cli client.Client,
 		if err := remove(handlers...); err != nil {
 			return err
 		}
-
 	}
 
 	return nil
