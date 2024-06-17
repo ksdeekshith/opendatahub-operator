@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 
+	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -64,34 +65,29 @@ func (r *Registry) ConfigureCapabilities(ctx context.Context, cli client.Client,
 		return false
 	}
 
-	// TODO(mvp): multi error
 	configure := func(handlers ...Handler) error {
+		var errConfig *multierror.Error
 		for _, handler := range handlers {
-			err := handler.Configure(ctx, cli, metaOptions...)
-			if err != nil {
-				return err
-			}
+			errConfig = multierror.Append(errConfig, handler.Configure(ctx, cli, metaOptions...))
 		}
 
-		return nil
+		return errConfig.ErrorOrNil()
 	}
 
 	remove := func(handlers ...Handler) error {
+		var errRemove *multierror.Error
 		for _, handler := range handlers {
-			err := handler.Remove(ctx, cli)
-			if err != nil {
-				return err
-			}
+			errRemove = multierror.Append(errRemove, handler.Remove(ctx, cli))
 		}
 
-		return nil
+		return errRemove.ErrorOrNil()
 	}
 
 	var err error
 
 	authInitializer := feature.ComponentFeaturesHandler("Platform", dsciSpec.ApplicationsNamespace, r.definePlatform())
 
-	// TODO: we need to track state if we once were deployed, but now not needed?
+	// TODO(mvp): we need to track state if we once were deployed, but now not needed?
 	if isRequired(handlers...) {
 		// return nil // nothing to do..
 		err = authInitializer.Apply()
@@ -99,7 +95,7 @@ func (r *Registry) ConfigureCapabilities(ctx context.Context, cli client.Client,
 			return err
 		}
 
-		// TODO: instead of a defined configure/remove phase.. should we simply call remove if !HasBeenConfigured incase it once was?
+		// TODO(mvp): instead of a defined configure/remove phase.. should we simply call remove if !HasBeenConfigured incase it once was?
 		err = configure(handlers...)
 		if err != nil {
 			return err
