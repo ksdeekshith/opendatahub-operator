@@ -83,7 +83,7 @@ func (r *Registry) ConfigureCapabilities(ctx context.Context, cli client.Client,
 
 	var err error
 
-	authInitializer := feature.ComponentFeaturesHandler("Platform", dsciSpec.ApplicationsNamespace, r.definePlatform())
+	authInitializer := feature.ComponentFeaturesHandler("Platform", dsciSpec.ApplicationsNamespace, r.definePlatformDeployment())
 
 	// TODO(mvp): we need to track state if we once were deployed, but now not needed?
 	if isRequired(handlers...) {
@@ -113,12 +113,13 @@ func (r *Registry) ConfigureCapabilities(ctx context.Context, cli client.Client,
 	return nil
 }
 
-func (r *Registry) definePlatform() feature.FeaturesProvider {
+func (r *Registry) definePlatformDeployment() feature.FeaturesProvider {
 	return func(registry feature.FeaturesRegistry) error {
-		return registry.Add(feature.Define("deploy-odh-platform").
-			Kustomize().
-			Location("/opt/manifests/platform/default").
-			Done(),
+		return registry.Add(
+			feature.Define("deploy-odh-platform").
+				Kustomize().
+				Location("/opt/manifests/platform/default").
+				Done(),
 		)
 	}
 }
