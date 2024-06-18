@@ -129,13 +129,15 @@ func (k *kustomizeManifest) Process(data any) ([]*unstructured.Unstructured, err
 		return nil, fmt.Errorf("targetNamespaces not defined")
 	}
 
-	if err := plugins.ApplyNamespacePlugin(targetNs, resMap); err != nil {
+	nsPlugin := plugins.CreateNamespaceApplierPlugin(targetNs)
+	if err := nsPlugin.Transform(resMap); err != nil {
 		return nil, err
 	}
 
 	componentName := getComponentName(data)
 	if componentName != "" {
-		if err := plugins.ApplyAddLabelsPlugin(componentName, resMap); err != nil {
+		labelsPlugin := plugins.CreateAddLabelsPlugin(componentName)
+		if err := labelsPlugin.Transform(resMap); err != nil {
 			return nil, err
 		}
 	}
