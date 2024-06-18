@@ -39,13 +39,15 @@ func (k *Kserve) defineServiceMeshFeatures(cli client.Client, dscispec *dsciv1.D
 
 		if authorinoInstalled {
 			kserveExtAuthzErr := registry.Add(feature.Define("kserve-external-authz").
-				ManifestsLocation(Resources.Location).
-				Manifests(
+				Manifests().
+				Location(Resources.Location).
+				Paths(
 					path.Join(Resources.ServiceMeshDir, "activator-envoyfilter.tmpl.yaml"),
 					path.Join(Resources.ServiceMeshDir, "envoy-oauth-temp-fix.tmpl.yaml"),
 					path.Join(Resources.ServiceMeshDir, "kserve-predictor-authorizationpolicy.tmpl.yaml"),
 					path.Join(Resources.ServiceMeshDir, "z-migrations"),
 				).
+				Done().
 				WithData(
 					feature.Entry("Domain", cluster.GetDomain),
 					servicemesh.FeatureData.ControlPlane.Create(dscispec).AsAction(),
@@ -63,10 +65,12 @@ func (k *Kserve) defineServiceMeshFeatures(cli client.Client, dscispec *dsciv1.D
 		}
 
 		return registry.Add(feature.Define("kserve-temporary-fixes").
-			ManifestsLocation(Resources.Location).
-			Manifests(
+			Manifests().
+			Location(Resources.Location).
+			Paths(
 				path.Join(Resources.ServiceMeshDir, "grpc-envoyfilter-temp-fix.tmpl.yaml"),
 			).
+			Done().
 			WithData(servicemesh.FeatureData.ControlPlane.Create(dscispec).AsAction()),
 		)
 	}

@@ -2,8 +2,6 @@ package capabilities
 
 import (
 	"context"
-	"os"
-	"path"
 
 	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
@@ -118,10 +116,9 @@ func (r *Registry) ConfigureCapabilities(ctx context.Context, cli client.Client,
 func (r *Registry) definePlatform() feature.FeaturesProvider {
 	return func(registry feature.FeaturesRegistry) error {
 		return registry.Add(feature.Define("deploy-odh-platform").
-			ManifestsLocation(os.DirFS(".")). // tmp, unused
-			Manifests(
-				path.Join("/opt/manifests/platform/default"),
-			),
+			Kustomize().
+			Location("/opt/manifests/platform/default").
+			Done(),
 		)
 	}
 }

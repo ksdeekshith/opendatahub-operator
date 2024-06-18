@@ -12,10 +12,12 @@ import (
 func (k *Kserve) configureServerlessFeatures(dsciSpec *dsciv1.DSCInitializationSpec) feature.FeaturesProvider {
 	return func(registry feature.FeaturesRegistry) error {
 		servingDeployment := feature.Define("serverless-serving-deployment").
-			ManifestsLocation(Resources.Location).
-			Manifests(
+			Manifests().
+			Location(Resources.Location).
+			Paths(
 				path.Join(Resources.InstallDir),
 			).
+			Done().
 			WithData(
 				serverless.FeatureData.IngressDomain.Create(&k.Serving).AsAction(),
 				serverless.FeatureData.Serving.Create(&k.Serving).AsAction(),
@@ -32,10 +34,12 @@ func (k *Kserve) configureServerlessFeatures(dsciSpec *dsciv1.DSCInitializationS
 			)
 
 		istioSecretFiltering := feature.Define("serverless-net-istio-secret-filtering").
-			ManifestsLocation(Resources.Location).
-			Manifests(
+			Manifests().
+			Location(Resources.Location).
+			Paths(
 				path.Join(Resources.BaseDir, "serving-net-istio-secret-filtering.patch.tmpl.yaml"),
 			).
+			Done().
 			WithData(serverless.FeatureData.Serving.Create(&k.Serving).AsAction()).
 			PreConditions(serverless.EnsureServerlessServingDeployed).
 			PostConditions(
@@ -43,10 +47,12 @@ func (k *Kserve) configureServerlessFeatures(dsciSpec *dsciv1.DSCInitializationS
 			)
 
 		servingGateway := feature.Define("serverless-serving-gateways").
-			ManifestsLocation(Resources.Location).
-			Manifests(
+			Manifests().
+			Location(Resources.Location).
+			Paths(
 				path.Join(Resources.GatewaysDir),
 			).
+			Done().
 			WithData(
 				serverless.FeatureData.IngressDomain.Create(&k.Serving).AsAction(),
 				serverless.FeatureData.Certificate.Create(&k.Serving).AsAction(),

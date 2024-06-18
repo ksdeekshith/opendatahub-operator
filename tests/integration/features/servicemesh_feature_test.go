@@ -200,8 +200,10 @@ var _ = Describe("Service Mesh setup", func() {
 					handler := feature.ClusterFeaturesHandler(dsci, func(registry feature.FeaturesRegistry) error {
 						return registry.Add(feature.Define("control-plane-with-external-authz-provider").
 							UsingConfig(envTest.Config).
-							ManifestsLocation(fixtures.TestEmbeddedFiles).
-							Manifests(path.Join("templates", "mesh-authz-ext-provider.patch.tmpl.yaml")).
+							Manifests().
+							Location(fixtures.TestEmbeddedFiles).
+							Paths(path.Join("templates", "mesh-authz-ext-provider.patch.tmpl.yaml")).
+							Done().
 							WithData(
 								servicemesh.FeatureData.Authorization.All(&dsci.Spec)...,
 							).

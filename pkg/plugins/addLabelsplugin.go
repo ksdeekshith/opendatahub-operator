@@ -2,14 +2,15 @@ package plugins
 
 import (
 	"sigs.k8s.io/kustomize/api/builtins" //nolint:staticcheck //Remove after package update
+	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/kustomize/kyaml/resid"
 
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/metadata/labels"
 )
 
-func CreateAddLabelsPlugin(componentName string) builtins.LabelTransformerPlugin {
-	return builtins.LabelTransformerPlugin{
+func CreateAddLabelsPlugin(componentName string) resmap.Transformer { //nolint:ireturn //reason returning struct conflicts due to pointer receiver
+	return &builtins.LabelTransformerPlugin{
 		Labels: map[string]string{
 			labels.ODH.Component(componentName): "true",
 			labels.K8SCommon.PartOf:             componentName,

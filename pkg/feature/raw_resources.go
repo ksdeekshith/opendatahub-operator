@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	YamlSeparator = "(?m)^---[ \t]*$"
+	resourceSeparator = "(?m)^---[ \t]*$"
 )
 
 func applyResources(cli client.Client, objects []*unstructured.Unstructured, metaOptions ...cluster.MetaOptions) error {

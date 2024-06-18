@@ -3,12 +3,13 @@ package plugins
 import (
 	"sigs.k8s.io/kustomize/api/builtins" //nolint:staticcheck // Remove after package update
 	"sigs.k8s.io/kustomize/api/filters/namespace"
+	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/kustomize/kyaml/resid"
 )
 
-func CreateNamespaceApplierPlugin(targetNamespace string) builtins.NamespaceTransformerPlugin {
-	return builtins.NamespaceTransformerPlugin{
+func CreateNamespaceApplierPlugin(targetNamespace string) resmap.Transformer { //nolint:ireturn //reason returning struct conflicts due to pointer receiver
+	return &builtins.NamespaceTransformerPlugin{
 		ObjectMeta: types.ObjectMeta{
 			Name:      "odh-namespace-plugin",
 			Namespace: targetNamespace,

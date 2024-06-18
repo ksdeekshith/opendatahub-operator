@@ -48,16 +48,15 @@ type Feature struct {
 	tracker *featurev1.FeatureTracker
 	source  *featurev1.Source
 
-	context   map[string]any
-	manifests []*Manifest
+	context            map[string]any
+	manifests          []*Manifest
+	kustomizeManifests []*KustomizeManifest
 
 	cleanups       []Action
 	resources      []Action
 	preconditions  []Action
 	postconditions []Action
 	dataProviders  []Action
-
-	fsys fs.FS
 }
 
 // Action is a func type which can be used for different purposes while having access to the owning Feature struct.
@@ -88,8 +87,8 @@ func (f *Feature) Apply() error {
 }
 
 // ApplyManifest applies the resources from defined manifest paths immediately.
-func (f *Feature) ApplyManifest(path string) error {
-	m, err := loadManifestsFrom(f.fsys, path)
+func (f *Feature) ApplyManifest(location fs.FS, path string) error {
+	m, err := loadManifestsFrom(location, path)
 	if err != nil {
 		return err
 	}
@@ -103,7 +102,7 @@ func (f *Feature) ApplyManifest(path string) error {
 		}
 
 		if f.Managed {
-			manifest.MarkAsManaged(objs)
+			markAsManaged(objs)
 		}
 
 		if err = apply(objs); err != nil {
@@ -175,11 +174,28 @@ func (f *Feature) applyFeature() error {
 		}
 
 		if f.Managed {
-			manifest.MarkAsManaged(objs)
+			markAsManaged(objs)
 		}
 
 		apply := createApplier(f.Client, manifest, OwnedBy(f))
 		if err := apply(objs); err != nil {
+			return &withConditionReasonError{reason: featurev1.ConditionReason.ApplyManifests, err: err}
+		}
+	}
+
+	for i := range f.kustomizeManifests {
+		kustomizeManifest := f.kustomizeManifests[i]
+
+		objs, processErr := kustomizeManifest.Process()
+		if processErr != nil {
+			return &withConditionReasonError{reason: featurev1.ConditionReason.ApplyManifests, err: processErr}
+		}
+
+		if f.Managed {
+			markAsManaged(objs)
+		}
+
+		if err := applyResources(f.Client, objs, OwnedBy(f)); err != nil {
 			return &withConditionReasonError{reason: featurev1.ConditionReason.ApplyManifests, err: err}
 		}
 	}

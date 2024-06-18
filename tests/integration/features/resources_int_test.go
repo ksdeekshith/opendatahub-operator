@@ -49,9 +49,11 @@ var _ = Describe("Applying and updating resources", func() {
 				return registry.Add(
 					feature.Define("create-local-gw-svc").
 						UsingConfig(envTest.Config).
-						ManifestsLocation(fixtures.TestEmbeddedFiles).
-						Manifests(path.Join(fixtures.BaseDir, "local-gateway-svc.tmpl.yaml")).
 						Managed().
+						Manifests().
+						Location(fixtures.TestEmbeddedFiles).
+						Paths(path.Join(fixtures.BaseDir, "local-gateway-svc.tmpl.yaml")).
+						Done().
 						WithData(feature.Entry("ControlPlane", provider.ValueOf(dsci.Spec.ServiceMesh.ControlPlane).Get)),
 				)
 			})
@@ -79,8 +81,10 @@ var _ = Describe("Applying and updating resources", func() {
 				return registry.Add(
 					feature.Define("create-local-gw-svc").
 						UsingConfig(envTest.Config).
-						ManifestsLocation(fixtures.TestEmbeddedFiles).
-						Manifests(path.Join(fixtures.BaseDir, "local-gateway-svc.tmpl.yaml")).
+						Manifests().
+						Location(fixtures.TestEmbeddedFiles).
+						Paths(path.Join(fixtures.BaseDir, "local-gateway-svc.tmpl.yaml")).
+						Done().
 						WithData(feature.Entry("ControlPlane", provider.ValueOf(dsci.Spec.ServiceMesh.ControlPlane).Get)),
 				)
 			})
@@ -104,8 +108,10 @@ var _ = Describe("Applying and updating resources", func() {
 				return registry.Add(
 					feature.Define("create-managed-svc").
 						UsingConfig(envTest.Config).
-						ManifestsLocation(fixtures.TestEmbeddedFiles).
-						Manifests(path.Join(fixtures.BaseDir, "managed-svc.yaml")).
+						Manifests().
+						Location(fixtures.TestEmbeddedFiles).
+						Paths(path.Join(fixtures.BaseDir, "managed-svc.yaml")).
+						Done().
 						WithData(feature.Entry("ControlPlane", provider.ValueOf(dsci.Spec.ServiceMesh.ControlPlane).Get)),
 				)
 			})

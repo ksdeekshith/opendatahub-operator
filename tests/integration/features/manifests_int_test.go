@@ -47,8 +47,10 @@ var _ = Describe("Manifest sources", func() {
 		featuresHandler := feature.ClusterFeaturesHandler(dsci, func(registry feature.FeaturesRegistry) error {
 			createNamespaceErr := registry.Add(feature.Define("create-namespace").
 				UsingConfig(envTest.Config).
-				ManifestsLocation(fixtures.TestEmbeddedFiles).
-				Manifests(path.Join(fixtures.BaseDir, "namespace.yaml")),
+				Manifests().
+				Location(fixtures.TestEmbeddedFiles).
+				Paths(path.Join(fixtures.BaseDir, "namespace.yaml")).
+				Done(),
 			)
 
 			Expect(createNamespaceErr).ToNot(HaveOccurred())
@@ -71,8 +73,10 @@ var _ = Describe("Manifest sources", func() {
 		featuresHandler := feature.ClusterFeaturesHandler(dsci, func(registry feature.FeaturesRegistry) error {
 			createServiceErr := registry.Add(feature.Define("create-local-gw-svc").
 				UsingConfig(envTest.Config).
-				ManifestsLocation(fixtures.TestEmbeddedFiles).
-				Manifests(path.Join(fixtures.BaseDir, "local-gateway-svc.tmpl.yaml")).
+				Manifests().
+				Location(fixtures.TestEmbeddedFiles).
+				Paths(path.Join(fixtures.BaseDir, "local-gateway-svc.tmpl.yaml")).
+				Done().
 				WithData(feature.Entry("ControlPlane", provider.ValueOf(dsci.Spec.ServiceMesh.ControlPlane).Get)),
 			)
 
@@ -104,8 +108,10 @@ metadata:
 		featuresHandler := feature.ClusterFeaturesHandler(dsci, func(registry feature.FeaturesRegistry) error {
 			createServiceErr := registry.Add(feature.Define("create-namespace").
 				UsingConfig(envTest.Config).
-				ManifestsLocation(os.DirFS(tempDir)).
-				Manifests(path.Join("namespace.yaml")), // must be relative to root DirFS defined above
+				Manifests().
+				Location(os.DirFS(tempDir)).
+				Paths(path.Join("namespace.yaml")). // must be relative to root DirFS defined above
+				Done(),
 			)
 
 			Expect(createServiceErr).ToNot(HaveOccurred())
@@ -133,8 +139,11 @@ metadata:
 		featuresHandler := feature.ClusterFeaturesHandler(dsci, func(registry feature.FeaturesRegistry) error {
 			return registry.Add(feature.Define("create-cfg-map").
 				UsingConfig(envTest.Config).
-				ManifestsLocation(os.DirFS(tempDir)).
-				Manifests(path.Join("fixtures", fixtures.BaseDir, "fake-kust-dir")))
+				Manifests().
+				Location(os.DirFS(tempDir)).
+				Paths(path.Join("fixtures", fixtures.BaseDir, "fake-kust-dir")).
+				Done(),
+			)
 		})
 
 		// when

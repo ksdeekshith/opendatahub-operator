@@ -118,10 +118,12 @@ func (r *DSCInitializationReconciler) serviceMeshCapabilityFeatures(dsci *dsciv1
 		serviceMeshSpec := dsci.Spec.ServiceMesh
 
 		smcp := feature.Define("mesh-control-plane-creation").
-			ManifestsLocation(Templates.Location).
-			Manifests(
+			Manifests().
+			Location(Templates.Location).
+			Paths(
 				path.Join(Templates.ServiceMeshDir),
 			).
+			Done().
 			WithData(servicemesh.FeatureData.ControlPlane.Create(&dsci.Spec).AsAction()).
 			PreConditions(
 				servicemesh.EnsureServiceMeshOperatorInstalled,
@@ -133,10 +135,12 @@ func (r *DSCInitializationReconciler) serviceMeshCapabilityFeatures(dsci *dsciv1
 
 		if serviceMeshSpec.ControlPlane.MetricsCollection == "Istio" {
 			metricsCollectionErr := registry.Add(feature.Define("mesh-metrics-collection").
-				ManifestsLocation(Templates.Location).
-				Manifests(
+				Manifests().
+				Location(Templates.Location).
+				Paths(
 					path.Join(Templates.MetricsDir),
 				).
+				Done().
 				WithData(
 					servicemesh.FeatureData.ControlPlane.Create(&dsci.Spec).AsAction(),
 				).
@@ -168,12 +172,14 @@ func (r *DSCInitializationReconciler) authorizationFeatures(dsci *dsciv1.DSCInit
 
 		return registry.Add(
 			feature.Define("mesh-control-plane-external-authz").
-				ManifestsLocation(Templates.Location).
-				Manifests(
+				Manifests().
+				Location(Templates.Location).
+				Paths(
 					path.Join(Templates.AuthorinoDir, "auth-smm.tmpl.yaml"),
 					path.Join(Templates.AuthorinoDir, "base"),
 					path.Join(Templates.AuthorinoDir, "mesh-authz-ext-provider.patch.tmpl.yaml"),
 				).
+				Done().
 				WithData(
 					servicemesh.FeatureData.ControlPlane.Create(&dsci.Spec).AsAction(),
 				).
@@ -196,7 +202,7 @@ func (r *DSCInitializationReconciler) authorizationFeatures(dsci *dsciv1.DSCInit
 						//
 						// To make it part of Service Mesh we have to patch it with injection
 						// enabled instead, otherwise it will not have proxy pod injected.
-						return f.ApplyManifest(path.Join(Templates.AuthorinoDir, "deployment.injection.patch.tmpl.yaml"))
+						return f.ApplyManifest(Templates.Location, path.Join(Templates.AuthorinoDir, "deployment.injection.patch.tmpl.yaml"))
 					},
 				).
 				OnDelete(

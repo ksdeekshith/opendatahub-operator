@@ -9,6 +9,7 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/plugins"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -126,7 +127,7 @@ data:
 
 	})
 
-	PDescribe("Kustomize Manifest Processing", func() {
+	Describe("Kustomize Manifest Processing", func() {
 
 		BeforeEach(func() {
 			path = "/path/to/kustomization/"
@@ -138,7 +139,7 @@ data:
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-- resource.yaml
+- resources.yaml
 `
 			resourceYaml := `
 apiVersion: v1
@@ -147,26 +148,30 @@ metadata:
   name: my-configmap
 data:
   key: value
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-other-configmap
+data:
+  key: value
 `
-			// data := feature.Feature{
-			//	TargetNamespace: "kust-ns",
-			//}
-
 			kustFsys := filesys.MakeFsInMemory()
 
 			Expect(kustFsys.WriteFile(filepath.Join(path, "kustomization.yaml"), []byte(kustomizationYaml))).To(Succeed())
-			Expect(kustFsys.WriteFile(filepath.Join(path, "resource.yaml"), []byte(resourceYaml))).To(Succeed())
-			// manifest := feature.CreateKustomizeManifestFrom("/path/to/kustomization/", kustFsys)
-			//
-			//// when
-			// manifests := []*feature.Manifest{manifest}
-			// objs := processManifests(data, manifests)
-			//
-			//// then
-			// Expect(objs).To(HaveLen(1))
-			// configMap := objs[0]
-			// Expect(configMap.GetKind()).To(Equal("ConfigMap"))
-			//Expect(configMap.GetName()).To(Equal("my-configmap"))
+			Expect(kustFsys.WriteFile(filepath.Join(path, "resources.yaml"), []byte(resourceYaml))).To(Succeed())
+			manifest := feature.CreateKustomizeManifest(kustFsys, "/path/to/kustomization/", plugins.CreateNamespaceApplierPlugin("kust-ns"))
+
+			// when
+			manifests := []*feature.KustomizeManifest{manifest}
+			objs := processKustomize(manifests)
+
+			// then
+			Expect(objs).To(HaveLen(2))
+			configMap := objs[0]
+			Expect(configMap.GetKind()).To(Equal("ConfigMap"))
+			Expect(configMap.GetName()).To(Equal("my-configmap"))
+			Expect(configMap.GetNamespace()).To(Equal("kust-ns"))
 		})
 	})
 
@@ -177,6 +182,19 @@ func processManifests(data any, m []*feature.Manifest) []*unstructured.Unstructu
 	var err error
 	for i := range m {
 		objs, err = m[i].Process(data)
+		if err != nil {
+			break
+		}
+	}
+	Expect(err).NotTo(HaveOccurred())
+	return objs
+}
+
+func processKustomize(m []*feature.KustomizeManifest) []*unstructured.Unstructured {
+	var objs []*unstructured.Unstructured
+	var err error
+	for i := range m {
+		objs, err = m[i].Process()
 		if err != nil {
 			break
 		}
