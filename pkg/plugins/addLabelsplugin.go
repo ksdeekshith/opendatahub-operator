@@ -9,6 +9,13 @@ import (
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/metadata/labels"
 )
 
+// CreateAddLabelsPlugin creates a label transformer plugin that ensures resources
+// to which this plugin is applied will have the Open Data Hub common labels included.
+//
+// It has a following characteristics:
+//   - It adds labels to the "metadata/labels" path for all resource kinds.
+//   - It adds labels to the "spec/template/metadata/labels" and "spec/selector/matchLabels" paths
+//     for resources of kind "Deployment".
 func CreateAddLabelsPlugin(componentName string) resmap.Transformer { //nolint:ireturn //reason returning struct conflicts due to pointer receiver
 	return &builtins.LabelTransformerPlugin{
 		Labels: map[string]string{

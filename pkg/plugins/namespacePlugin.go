@@ -8,6 +8,7 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/resid"
 )
 
+// CreateNamespaceApplierPlugin creates a plugin to ensure resources have the specified target namespace.
 func CreateNamespaceApplierPlugin(targetNamespace string) resmap.Transformer { //nolint:ireturn //reason returning struct conflicts due to pointer receiver
 	return &builtins.NamespaceTransformerPlugin{
 		ObjectMeta: types.ObjectMeta{
