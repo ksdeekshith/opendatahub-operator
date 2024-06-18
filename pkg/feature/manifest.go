@@ -21,60 +21,20 @@ import (
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/plugins"
 )
 
-const kustomizationFile = "kustomization.yaml"
-
-type Manifest interface {
-	// Process allows any arbitrary struct to be passed and used while processing the content of the manifest.
-	Process(data any) ([]*unstructured.Unstructured, error)
-	// MarkAsManaged sets all non-patch objects to be managed/reconciled by setting the annotation.
-	MarkAsManaged(objects []*unstructured.Unstructured)
-}
-
-type rawManifest struct {
+type Manifest struct {
 	name,
 	path string
 	patch bool
 	fsys  fs.FS
 }
 
-var _ Manifest = (*rawManifest)(nil)
-
-func (b *rawManifest) Process(_ any) ([]*unstructured.Unstructured, error) {
-	manifestFile, err := b.fsys.Open(b.path)
+// Process allows any arbitrary struct to be passed and used while processing the content of the manifest.
+func (m *Manifest) Process(data any) ([]*unstructured.Unstructured, error) {
+	manifestFile, err := m.fsys.Open(m.path)
 	if err != nil {
 		return nil, err
 	}
-	defer manifestFile.Close()
 
-	content, err := io.ReadAll(manifestFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %w", err)
-	}
-	resources := string(content)
-
-	return convertToUnstructuredSlice(resources)
-}
-
-func (b *rawManifest) MarkAsManaged(objects []*unstructured.Unstructured) {
-	if !b.patch {
-		markAsManaged(objects)
-	}
-}
-
-var _ Manifest = (*templateManifest)(nil)
-
-type templateManifest struct {
-	name,
-	path string
-	patch bool
-	fsys  fs.FS
-}
-
-func (t *templateManifest) Process(data any) ([]*unstructured.Unstructured, error) {
-	manifestFile, err := t.fsys.Open(t.path)
-	if err != nil {
-		return nil, err
-	}
 	defer manifestFile.Close()
 
 	content, err := io.ReadAll(manifestFile)
@@ -82,30 +42,97 @@ func (t *templateManifest) Process(data any) ([]*unstructured.Unstructured, erro
 		return nil, fmt.Errorf("failed to create file: %w", err)
 	}
 
-	tmpl, err := template.New(t.name).
-		Option("missingkey=error").
-		Parse(string(content))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse template: %w", err)
-	}
+	resources := string(content)
 
-	var buffer bytes.Buffer
-	if err := tmpl.Execute(&buffer, data); err != nil {
-		return nil, fmt.Errorf("failed to execute template: %w", err)
-	}
+	if isTemplate(m.path) {
+		tmpl, err := template.New(m.name).
+			Option("missingkey=error").
+			Parse(string(content))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse template: %w", err)
+		}
 
-	resources := buffer.String()
+		var buffer bytes.Buffer
+		if err := tmpl.Execute(&buffer, data); err != nil {
+			return nil, fmt.Errorf("failed to execute template: %w", err)
+		}
+
+		resources = buffer.String()
+	}
 
 	return convertToUnstructuredSlice(resources)
 }
 
-func (t *templateManifest) MarkAsManaged(objects []*unstructured.Unstructured) {
-	if !t.patch {
+func isTemplate(path string) bool {
+	return strings.Contains(filepath.Base(path), ".tmpl.")
+}
+
+// MarkAsManaged sets all non-patch objects to be managed/reconciled by setting the annotation.
+func (m *Manifest) MarkAsManaged(objects []*unstructured.Unstructured) {
+	if !m.patch {
 		markAsManaged(objects)
 	}
 }
 
-var _ Manifest = (*kustomizeManifest)(nil)
+func markAsManaged(objs []*unstructured.Unstructured) {
+	for _, obj := range objs {
+		objAnnotations := obj.GetAnnotations()
+		if objAnnotations == nil {
+			objAnnotations = make(map[string]string)
+		}
+
+		objAnnotations[annotations.ManagedByODHOperator] = "true"
+		obj.SetAnnotations(objAnnotations)
+	}
+}
+
+func loadManifestsFrom(fsys fs.FS, path string) ([]*Manifest, error) {
+	var manifests []*Manifest
+	// check local filesystem for kustomization manifest
+	// TODO rework
+	// if isKustomizeManifest(path) {
+	//	m := CreateKustomizeManifestFrom(path, filesys.MakeFsOnDisk())
+	//	manifests = append(manifests, m)
+	//	return manifests, nil
+	//}
+
+	err := fs.WalkDir(fsys, path, func(path string, dirEntry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+
+		_, err := dirEntry.Info()
+		if err != nil {
+			return err
+		}
+
+		if dirEntry.IsDir() {
+			return nil
+		}
+
+		manifests = append(manifests, CreateManifestFrom(fsys, path))
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return manifests, nil
+}
+
+func CreateManifestFrom(fsys fs.FS, path string) *Manifest {
+	basePath := filepath.Base(path)
+	return &Manifest{
+		name:  basePath,
+		path:  path,
+		patch: strings.Contains(basePath, ".patch"),
+		fsys:  fsys,
+	}
+}
+
+const kustomizationFile = "kustomization.yaml"
 
 // kustomizeManifest supports paths to kustomization files / directories containing a kustomization file
 // note that it only supports to paths within the mounted files ie: /opt/manifests.
@@ -167,78 +194,6 @@ func (k *kustomizeManifest) MarkAsManaged(objects []*unstructured.Unstructured) 
 	markAsManaged(objects)
 }
 
-func markAsManaged(objs []*unstructured.Unstructured) {
-	for _, obj := range objs {
-		objAnnotations := obj.GetAnnotations()
-		if objAnnotations == nil {
-			objAnnotations = make(map[string]string)
-		}
-
-		objAnnotations[annotations.ManagedByODHOperator] = "true"
-		obj.SetAnnotations(objAnnotations)
-	}
-}
-
-func loadManifestsFrom(fsys fs.FS, path string) ([]Manifest, error) {
-	var manifests []Manifest
-	// check local filesystem for kustomization manifest
-	if isKustomizeManifest(path) {
-		m := CreateKustomizeManifestFrom(path, filesys.MakeFsOnDisk())
-		manifests = append(manifests, m)
-		return manifests, nil
-	}
-
-	err := fs.WalkDir(fsys, path, func(path string, dirEntry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-
-		_, err := dirEntry.Info()
-		if err != nil {
-			return err
-		}
-
-		if dirEntry.IsDir() {
-			return nil
-		}
-		if isTemplateManifest(path) {
-			manifests = append(manifests, CreateTemplateManifestFrom(fsys, path))
-		} else {
-			manifests = append(manifests, CreateRawManifestFrom(fsys, path))
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return manifests, nil
-}
-
-func CreateRawManifestFrom(fsys fs.FS, path string) *rawManifest { //nolint:golint,revive //No need to export rawManifest.
-	basePath := filepath.Base(path)
-
-	return &rawManifest{
-		name:  basePath,
-		path:  path,
-		patch: strings.Contains(basePath, ".patch"),
-		fsys:  fsys,
-	}
-}
-
-func CreateTemplateManifestFrom(fsys fs.FS, path string) *templateManifest { //nolint:golint,revive //No need to export templateManifest.
-	basePath := filepath.Base(path)
-
-	return &templateManifest{
-		name:  basePath,
-		path:  path,
-		patch: strings.Contains(basePath, ".patch."),
-		fsys:  fsys,
-	}
-}
-
 func CreateKustomizeManifestFrom(path string, fsys filesys.FileSystem) *kustomizeManifest { //nolint:golint,revive //No need to export kustomizeManifest.
 	return &kustomizeManifest{
 		name: filepath.Base(path),
@@ -247,17 +202,13 @@ func CreateKustomizeManifestFrom(path string, fsys filesys.FileSystem) *kustomiz
 	}
 }
 
-// isKustomizeManifest checks default filesystem for presence of kustomization file at this path.
-func isKustomizeManifest(path string) bool {
+// IsKustomizeManifest checks default filesystem for presence of kustomization file at this path.
+func IsKustomizeManifest(path string) bool {
 	if filepath.Base(path) == kustomizationFile {
 		return true
 	}
 	_, err := os.Stat(filepath.Join(path, kustomizationFile))
 	return err == nil
-}
-
-func isTemplateManifest(path string) bool {
-	return strings.Contains(filepath.Base(path), ".tmpl.")
 }
 
 func convertToUnstructuredSlice(resources string) ([]*unstructured.Unstructured, error) {

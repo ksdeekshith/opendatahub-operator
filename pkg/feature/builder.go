@@ -85,7 +85,7 @@ func (fb *featureBuilder) ManifestsLocation(fsys fs.FS) *requiresManifestSourceB
 func (fb *requiresManifestSourceBuilder) Manifests(paths ...string) *featureBuilder {
 	fb.builders = append(fb.builders, func(f *Feature) error {
 		var err error
-		var manifests []Manifest
+		var manifests []*Manifest
 
 		for _, path := range paths {
 			manifests, err = loadManifestsFrom(fb.fsys, path)

@@ -49,7 +49,7 @@ type Feature struct {
 	source  *featurev1.Source
 
 	context   map[string]any
-	manifests []Manifest
+	manifests []*Manifest
 
 	cleanups       []Action
 	resources      []Action
@@ -96,7 +96,7 @@ func (f *Feature) ApplyManifest(path string) error {
 	for i := range m {
 		var objs []*unstructured.Unstructured
 		manifest := m[i]
-		apply := f.createApplier(manifest)
+		apply := createApplier(f.Client, manifest, OwnedBy(f))
 
 		if objs, err = manifest.Process(f.context); err != nil {
 			return errors.WithStack(err)
@@ -178,7 +178,7 @@ func (f *Feature) applyFeature() error {
 			manifest.MarkAsManaged(objs)
 		}
 
-		apply := f.createApplier(manifest)
+		apply := createApplier(f.Client, manifest, OwnedBy(f))
 		if err := apply(objs); err != nil {
 			return &withConditionReasonError{reason: featurev1.ConditionReason.ApplyManifests, err: err}
 		}
@@ -196,24 +196,15 @@ func (f *Feature) applyFeature() error {
 
 type applier func(objects []*unstructured.Unstructured) error
 
-func (f *Feature) createApplier(m Manifest) applier {
-	switch manifest := m.(type) {
-	case *templateManifest:
-		if manifest.patch {
-			return func(objects []*unstructured.Unstructured) error {
-				return patchResources(f.Client, objects)
-			}
-		}
-	case *rawManifest:
-		if manifest.patch {
-			return func(objects []*unstructured.Unstructured) error {
-				return patchResources(f.Client, objects)
-			}
+func createApplier(cli client.Client, m *Manifest, options ...cluster.MetaOptions) applier {
+	if m.patch {
+		return func(objects []*unstructured.Unstructured) error {
+			return patchResources(cli, objects)
 		}
 	}
 
 	return func(objects []*unstructured.Unstructured) error {
-		return applyResources(f.Client, objects, OwnedBy(f))
+		return applyResources(cli, objects, options...)
 	}
 }
 
