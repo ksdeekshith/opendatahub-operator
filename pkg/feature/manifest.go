@@ -7,13 +7,9 @@ import (
 	"io"
 	"io/fs"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/yaml"
-
-	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/metadata/annotations"
 )
 
 type Manifest struct {
@@ -55,23 +51,11 @@ func (m *Manifest) Process(data any) ([]*unstructured.Unstructured, error) {
 		resources = buffer.String()
 	}
 
-	return convertToUnstructured(resources)
+	return ConvertToUnstructured(resources)
 }
 
 func isTemplate(path string) bool {
 	return strings.Contains(filepath.Base(path), ".tmpl.")
-}
-
-func markAsManaged(objs []*unstructured.Unstructured) {
-	for _, obj := range objs {
-		objAnnotations := obj.GetAnnotations()
-		if objAnnotations == nil {
-			objAnnotations = make(map[string]string)
-		}
-
-		objAnnotations[annotations.ManagedByODHOperator] = "true"
-		obj.SetAnnotations(objAnnotations)
-	}
 }
 
 func CreateManifestFrom(fsys fs.FS, path string) *Manifest {
@@ -111,22 +95,4 @@ func loadManifestsFrom(fsys fs.FS, path string) ([]*Manifest, error) {
 	}
 
 	return manifests, nil
-}
-
-func convertToUnstructured(resources string) ([]*unstructured.Unstructured, error) {
-	splitter := regexp.MustCompile(resourceSeparator)
-	objectStrings := splitter.Split(resources, -1)
-	objs := make([]*unstructured.Unstructured, 0, len(objectStrings))
-	for _, str := range objectStrings {
-		if strings.TrimSpace(str) == "" {
-			continue
-		}
-		u := &unstructured.Unstructured{}
-		if err := yaml.Unmarshal([]byte(str), u); err != nil {
-			return nil, err
-		}
-
-		objs = append(objs, u)
-	}
-	return objs, nil
 }

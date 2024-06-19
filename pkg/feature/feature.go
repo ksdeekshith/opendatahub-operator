@@ -102,7 +102,7 @@ func (f *Feature) ApplyManifest(location fs.FS, path string) error {
 		}
 
 		if f.Managed {
-			markAsManaged(objs)
+			MarkAsManaged(objs)
 		}
 
 		if err = apply(objs); err != nil {
@@ -174,7 +174,7 @@ func (f *Feature) applyFeature() error {
 		}
 
 		if f.Managed {
-			markAsManaged(objs)
+			MarkAsManaged(objs)
 		}
 
 		apply := createApplier(f.Client, manifest, OwnedBy(f))
@@ -192,7 +192,7 @@ func (f *Feature) applyFeature() error {
 		}
 
 		if f.Managed {
-			markAsManaged(objs)
+			MarkAsManaged(objs)
 		}
 
 		if err := applyResources(f.Client, objs, OwnedBy(f)); err != nil {
