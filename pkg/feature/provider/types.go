@@ -34,19 +34,19 @@ type Defaulter[T any] interface {
 // - `OrElse` to define a static value
 // - `OrGet` to perform dynamic lookup by providing DataProviderFunc.
 type DataProviderWithDefault[T any] struct {
-	value T //nolint:structcheck //reason used in e.g. Get
+	value T
 }
 
 var _ DataProvider[any] = (*DataProviderWithDefault[any])(nil)
 var _ Defaulter[any] = (*DataProviderWithDefault[any])(nil)
 
 // Get returns Value() of Defaulter and ensures DataProviderWithDefault can be used as DataProviderFunc.
-func (d DataProviderWithDefault[T]) Get(_ context.Context, _ client.Client) (T, error) { //nolint:ireturn //reason: returns T[any] generic type
+func (d DataProviderWithDefault[T]) Get(_ context.Context, _ client.Client) (T, error) { //nolint:ireturn //reason: returns generic T
 	return d.value, nil
 }
 
 // Value returns actual value stored by the provider.
-func (d DataProviderWithDefault[T]) Value() T { //nolint:ireturn //reason: returns T[any] generic type
+func (d DataProviderWithDefault[T]) Value() T { //nolint:ireturn //reason: returns generic T
 	return d.value
 }
 

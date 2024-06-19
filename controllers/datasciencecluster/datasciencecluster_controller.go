@@ -274,7 +274,7 @@ func (r *DataScienceClusterReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, configErr
 	}
 
-	// Process errors for components
+	// process errors for components
 	if componentErrors != nil {
 		r.Log.Info("DataScienceCluster Deployment Incomplete.")
 		instance, err = status.UpdateWithRetry(ctx, r.Client, instance, func(saved *dsc.DataScienceCluster) {

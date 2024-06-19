@@ -43,10 +43,10 @@ func (k *KustomizeManifest) Process() ([]*unstructured.Unstructured, error) {
 		}
 	}
 
-	return ConvertToUnstructuredObjects(resMap)
+	return convertToUnstructuredObjects(resMap)
 }
 
-func ConvertToUnstructuredObjects(resMap resmap.ResMap) ([]*unstructured.Unstructured, error) {
+func convertToUnstructuredObjects(resMap resmap.ResMap) ([]*unstructured.Unstructured, error) {
 	resources := make([]*unstructured.Unstructured, 0, resMap.Size())
 	for _, res := range resMap.Resources() {
 		u := &unstructured.Unstructured{}

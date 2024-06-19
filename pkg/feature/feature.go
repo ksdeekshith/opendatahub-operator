@@ -9,12 +9,13 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	featurev1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/features/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/controllers/status"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/manifest"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/metadata/annotations"
 )
 
 // Feature is a high-level abstraction that represents a collection of resources and actions
@@ -49,7 +50,7 @@ type Feature struct {
 	source  *featurev1.Source
 
 	context            map[string]any
-	manifests          []*Manifest
+	manifests          []*manifest.Manifest
 	kustomizeManifests []*KustomizeManifest
 
 	cleanups       []Action
@@ -88,25 +89,20 @@ func (f *Feature) Apply() error {
 
 // ApplyManifest applies the resources from defined manifest paths immediately.
 func (f *Feature) ApplyManifest(location fs.FS, path string) error {
-	m, err := loadManifestsFrom(location, path)
+	m, err := manifest.LoadManifests(location, path)
 	if err != nil {
 		return err
 	}
 	for i := range m {
-		var objs []*unstructured.Unstructured
-		manifest := m[i]
-		apply := createApplier(f.Client, manifest, OwnedBy(f))
-
-		if objs, err = manifest.Process(f.context); err != nil {
-			return errors.WithStack(err)
-		}
-
+		manifestFile := m[i]
+		metaOptions := []cluster.MetaOptions{OwnedBy(f)}
 		if f.Managed {
-			MarkAsManaged(objs)
+			metaOptions = append(metaOptions, cluster.WithAnnotations(annotations.ManagedByODHOperator, "true"))
 		}
 
-		if err = apply(objs); err != nil {
-			return errors.WithStack(err)
+		applier := manifest.CreateApplier(context.TODO(), f.Client, manifestFile, f.context, metaOptions...)
+		if errApply := applier.Apply(); errApply != nil {
+			return errors.WithStack(errApply)
 		}
 	}
 	return nil
@@ -165,37 +161,28 @@ func (f *Feature) applyFeature() error {
 		}
 	}
 
+	manifestsMeta := []cluster.MetaOptions{OwnedBy(f)}
+	if f.Managed {
+		manifestsMeta = append(manifestsMeta, cluster.WithAnnotations(annotations.ManagedByODHOperator, "true"))
+	}
 	for i := range f.manifests {
-		manifest := f.manifests[i]
-
-		objs, processErr := manifest.Process(f.context)
-		if processErr != nil {
+		m := f.manifests[i]
+		applier := manifest.CreateApplier(context.TODO(), f.Client, m, f.context, manifestsMeta...)
+		if processErr := applier.Apply(); processErr != nil {
 			return &withConditionReasonError{reason: featurev1.ConditionReason.ApplyManifests, err: processErr}
-		}
-
-		if f.Managed {
-			MarkAsManaged(objs)
-		}
-
-		apply := createApplier(f.Client, manifest, OwnedBy(f))
-		if err := apply(objs); err != nil {
-			return &withConditionReasonError{reason: featurev1.ConditionReason.ApplyManifests, err: err}
 		}
 	}
 
 	for i := range f.kustomizeManifests {
 		kustomizeManifest := f.kustomizeManifests[i]
 
+		// TODO rework to APPLY
 		objs, processErr := kustomizeManifest.Process()
 		if processErr != nil {
 			return &withConditionReasonError{reason: featurev1.ConditionReason.ApplyManifests, err: processErr}
 		}
 
-		if f.Managed {
-			MarkAsManaged(objs)
-		}
-
-		if err := applyResources(f.Client, objs, OwnedBy(f)); err != nil {
+		if err := cluster.ApplyResources(context.TODO(), f.Client, objs, manifestsMeta...); err != nil {
 			return &withConditionReasonError{reason: featurev1.ConditionReason.ApplyManifests, err: err}
 		}
 	}
@@ -208,20 +195,6 @@ func (f *Feature) applyFeature() error {
 	}
 
 	return nil
-}
-
-type applier func(objects []*unstructured.Unstructured) error
-
-func createApplier(cli client.Client, m *Manifest, options ...cluster.MetaOptions) applier {
-	if m.patch {
-		return func(objects []*unstructured.Unstructured) error {
-			return patchResources(cli, objects)
-		}
-	}
-
-	return func(objects []*unstructured.Unstructured) error {
-		return applyResources(cli, objects, options...)
-	}
 }
 
 // AsOwnerReference returns an OwnerReference for the FeatureTracker resource.

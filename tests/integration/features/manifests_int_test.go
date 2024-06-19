@@ -130,7 +130,7 @@ metadata:
 	})
 
 	// TODO(mvp): kustomize manifests need to be reworked and have target namespace/plugin passed instead of assuming it is
-	// passed as part of Process(data any)
+	// passed as part of process(data any)
 	PIt("should process kustomization manifests directly from the file system", func() {
 		// TODO: we create dummy tempdir just to pass in for ManifestSource - messy but temporary?
 		tempDir := GinkgoT().TempDir()

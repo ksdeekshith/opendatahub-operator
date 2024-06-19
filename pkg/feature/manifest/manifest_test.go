@@ -1,4 +1,4 @@
-package feature_test
+package manifest_test
 
 import (
 	"io/fs"
@@ -9,6 +9,7 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/manifest"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/plugins"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -54,17 +55,15 @@ data:
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("should process the raw manifest with no substitutions", func() {
+		It("should Process the raw manifest with no substitutions", func() {
 			// given
-			manifest := feature.CreateManifestFrom(inMemFS, path)
-
+			manifests := []*manifest.Manifest{manifest.Create(inMemFS, path)}
 			data := struct{ TargetNamespace string }{
 				TargetNamespace: "not-used",
 			}
 
 			// when
 			// Simulate adding to and processing from a slice of Manifest interfaces
-			manifests := []*feature.Manifest{manifest}
 			objs := processManifests(data, manifests)
 
 			Expect(objs).To(HaveLen(1))
@@ -83,7 +82,6 @@ metadata:
 data:
   key: FeatureContext
 `
-
 		BeforeEach(func() {
 			path = "path/to/template.tmpl.yaml"
 			err := afero.WriteFile(inMemFS.Afs, path, []byte(resourceYaml), 0644)
@@ -97,7 +95,7 @@ data:
 			data := map[string]string{
 				"TargetNamespace": "template-ns",
 			}
-			manifest := feature.CreateManifestFrom(inMemFS, pathToBrokenTpl)
+			manifest := manifest.Create(inMemFS, pathToBrokenTpl)
 
 			// when
 			_, err := manifest.Process(data)
@@ -108,14 +106,13 @@ data:
 
 		It("should substitute target namespace in the templated manifest", func() {
 			// given
+			manifests := []*manifest.Manifest{manifest.Create(inMemFS, path)}
 			data := struct{ TargetNamespace string }{
 				TargetNamespace: "template-ns",
 			}
-			manifest := feature.CreateManifestFrom(inMemFS, path)
 
 			// when
 			// Simulate adding to and processing from a slice of Manifest interfaces
-			manifests := []*feature.Manifest{manifest}
 			objs := processManifests(data, manifests)
 
 			// then
@@ -133,7 +130,7 @@ data:
 			path = "/path/to/kustomization/"
 		})
 
-		It("should process the ConfigMap resource from the kustomize manifest", func() {
+		It("should Process the ConfigMap resource from the kustomize manifest", func() {
 			// given
 			kustomizationYaml := `
 apiVersion: kustomize.config.k8s.io/v1beta1
@@ -177,7 +174,7 @@ data:
 
 })
 
-func processManifests(data any, m []*feature.Manifest) []*unstructured.Unstructured {
+func processManifests(data any, m []*manifest.Manifest) []*unstructured.Unstructured {
 	var objs []*unstructured.Unstructured
 	var err error
 	for i := range m {

@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 
 	featurev1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/features/v1"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/manifest"
 )
 
 type partialBuilder func(f *Feature) error
@@ -108,10 +109,10 @@ func (mb *manifestSubBuilder) Paths(paths ...string) ManifestBuilder { //nolint:
 func (mb *manifestSubBuilder) Done() *featureBuilder {
 	mb.builders = append(mb.builders, func(f *Feature) error {
 		var err error
-		var manifests []*Manifest
+		var manifests []*manifest.Manifest
 
 		for _, path := range mb.paths {
-			manifests, err = loadManifestsFrom(mb.manifestLocation, path)
+			manifests, err = manifest.LoadManifests(mb.manifestLocation, path)
 			if err != nil {
 				return errors.WithStack(err)
 			}

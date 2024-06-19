@@ -1,5 +1,5 @@
 //nolint:structcheck,ireturn //reason: false positive, complains about unused fields - see Update method
-//nolint:ireturn //reason: generic return types
+
 package status
 
 import (
