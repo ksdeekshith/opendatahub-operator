@@ -194,7 +194,6 @@ func DeleteClusterRole(ctx context.Context, cli client.Client, name string) erro
 func CreateOrUpdateClusterRoleBinding(ctx context.Context, cli client.Client, name string,
 	subjects []authv1.Subject, roleRef authv1.RoleRef,
 	metaOptions ...MetaOptions) (*authv1.ClusterRoleBinding, error) {
-	
 	desiredClusterRoleBinding := &authv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,

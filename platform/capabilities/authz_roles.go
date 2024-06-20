@@ -13,9 +13,8 @@ import (
 
 const roleName = "platform-protected-resources-watcher"
 
-// CreateOrUpdateAuthzBindings
+// CreateOrUpdateAuthzBindings.
 func CreateOrUpdateAuthzBindings(ctx context.Context, cli client.Client, protectedResources []ProtectedResource, metaOptions ...cluster.MetaOptions) error {
-
 	if _, err := cluster.CreateOrUpdateClusterRole(ctx, cli, roleName, createAuthRules(protectedResources), metaOptions...); err != nil {
 		return fmt.Errorf("failed creating cluster role: %w", err)
 	}
@@ -30,7 +29,6 @@ func CreateOrUpdateAuthzBindings(ctx context.Context, cli client.Client, protect
 
 // DeleteAuthzBindings attempts to remove created authz role/bindings but does not fail if these are not existing in the cluster.
 func DeleteAuthzBindings(ctx context.Context, cli client.Client) error {
-
 	if err := cluster.DeleteClusterRoleBinding(ctx, cli, roleName); !apierrors.IsNotFound(err) {
 		return err
 	}
