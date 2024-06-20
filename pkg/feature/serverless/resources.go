@@ -4,6 +4,7 @@ import (
 	"context"
 
 	infrav1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/infrastructure/v1"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/servicemesh"
 )
@@ -14,13 +15,19 @@ func ServingCertificateResource(f *feature.Feature) error {
 		return err
 	}
 
-	return feature.CreateSelfSignedCertificate(
-		context.TODO(), f.Client,
-		secretData.Name,
-		secretData.Type,
-		secretData.Domain,
-		secretData.Namespace,
-	)
+	switch secretData.Type {
+	case infrav1.SelfSigned:
+		return cluster.CreateSelfSignedCertificate(
+			context.TODO(), f.Client,
+			secretData.Name,
+			secretData.Domain,
+			secretData.Namespace,
+			feature.OwnedBy(f))
+	case infrav1.Provided:
+		return nil
+	default:
+		return cluster.PropagateDefaultIngressCertificate(context.TODO(), f.Client, secretData.Name, secretData.Namespace)
+	}
 }
 
 type secretParams struct {

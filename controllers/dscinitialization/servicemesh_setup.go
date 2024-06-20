@@ -17,7 +17,14 @@ import (
 )
 
 func (r *DSCInitializationReconciler) configureServiceMesh(instance *dsciv1.DSCInitialization) error {
-	switch instance.Spec.ServiceMesh.ManagementState {
+	serviceMeshManagementState := operatorv1.Removed
+	if instance.Spec.ServiceMesh != nil {
+		serviceMeshManagementState = instance.Spec.ServiceMesh.ManagementState
+	} else {
+		r.Log.Info("ServiceMesh is not configured in DSCI, same as default to 'Removed'")
+	}
+
+	switch serviceMeshManagementState {
 	case operatorv1.Managed:
 
 		capabilities := []*feature.HandlerWithReporter[*dsciv1.DSCInitialization]{
@@ -47,12 +54,14 @@ func (r *DSCInitializationReconciler) configureServiceMesh(instance *dsciv1.DSCI
 			return err
 		}
 	}
-
 	return nil
 }
 
 func (r *DSCInitializationReconciler) removeServiceMesh(instance *dsciv1.DSCInitialization) error {
 	// on condition of Managed, do not handle Removed when set to Removed it trigger DSCI reconcile to clean up
+	if instance.Spec.ServiceMesh == nil {
+		return nil
+	}
 	if instance.Spec.ServiceMesh.ManagementState == operatorv1.Managed {
 		capabilities := []*feature.HandlerWithReporter[*dsciv1.DSCInitialization]{
 			r.serviceMeshCapability(instance, serviceMeshCondition(status.RemovedReason, "Service Mesh removed")),
@@ -75,7 +84,6 @@ func (r *DSCInitializationReconciler) removeServiceMesh(instance *dsciv1.DSCInit
 			}
 		}
 	}
-
 	return nil
 }
 

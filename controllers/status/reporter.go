@@ -1,3 +1,4 @@
+//nolint:ireturn //reason: return T which is expected to be satisfying client.Object interface
 package status
 
 import (

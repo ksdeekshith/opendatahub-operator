@@ -52,7 +52,7 @@ linters:
     - nosnakecase # snakecase is used in a lot of places. Need to check if that is required.
     - paralleltest # [too many false positives] detects missing usage of t.Parallel() method in your Go test
     - scopelint # deprecated
-    - structcheck # deprecated, but also causing weird formatting/autofixes issues with removing nolint directives for other linters
+    - structcheck # deprecated
     - tagliatelle
     - varcheck # deprecated
     - varnamelen # doesnot allow shorter names like c,k etc. But golang prefers short named vars.

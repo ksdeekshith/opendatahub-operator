@@ -189,30 +189,23 @@ func SetCompleteCondition(conditions *[]conditionsv1.Condition, reason string, m
 	conditionsv1.RemoveStatusCondition(conditions, CapabilityDSPv2Argo)
 }
 
-// SetComponentCondition appends Condition Type with const ReadySuffix for given component
-// when component finished reconcile.
-func SetComponentCondition(conditions *[]conditionsv1.Condition, component string, reason string, message string, status corev1.ConditionStatus) {
-	condtype := component + ReadySuffix
-	conditionsv1.SetStatusCondition(conditions, conditionsv1.Condition{
-		Type:    conditionsv1.ConditionType(condtype),
-		Status:  status,
-		Reason:  reason,
-		Message: message,
-	})
-}
-
-// RemoveComponentCondition remove Condition of giving component.
-func RemoveComponentCondition(conditions *[]conditionsv1.Condition, component string) {
-	condType := component + ReadySuffix
-	conditionsv1.RemoveStatusCondition(conditions, conditionsv1.ConditionType(condType))
-}
-
-// SetGeneralCondition function to patch any type of condition.
-func SetGeneralCondition(conditions *[]conditionsv1.Condition, conditionType string, reason string, message string, status corev1.ConditionStatus) {
+// SetCondition is a general purpose function to update any type of condition.
+func SetCondition(conditions *[]conditionsv1.Condition, conditionType string, reason string, message string, status corev1.ConditionStatus) {
 	conditionsv1.SetStatusCondition(conditions, conditionsv1.Condition{
 		Type:    conditionsv1.ConditionType(conditionType),
 		Status:  status,
 		Reason:  reason,
 		Message: message,
 	})
+}
+
+// SetComponentCondition appends Condition Type with const ReadySuffix for given component
+// when component finished reconcile.
+func SetComponentCondition(conditions *[]conditionsv1.Condition, component string, reason string, message string, status corev1.ConditionStatus) {
+	SetCondition(conditions, component+ReadySuffix, reason, message, status)
+}
+
+// RemoveComponentCondition remove Condition of giving component.
+func RemoveComponentCondition(conditions *[]conditionsv1.Condition, component string) {
+	conditionsv1.RemoveStatusCondition(conditions, conditionsv1.ConditionType(component+ReadySuffix))
 }

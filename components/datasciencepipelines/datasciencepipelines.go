@@ -171,12 +171,6 @@ func UnmanagedArgoWorkFlowExists(ctx context.Context,
 }
 
 func SetExistingArgoCondition(conditions *[]conditionsv1.Condition, reason, message string) {
-	conditionsv1.SetStatusCondition(conditions, conditionsv1.Condition{
-		Type:    status.CapabilityDSPv2Argo,
-		Status:  corev1.ConditionFalse,
-		Reason:  reason,
-		Message: message,
-	})
-
+	status.SetCondition(conditions, string(status.CapabilityDSPv2Argo), reason, message, corev1.ConditionFalse)
 	status.SetComponentCondition(conditions, ComponentName, status.ReconcileFailed, message, corev1.ConditionFalse)
 }

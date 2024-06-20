@@ -82,11 +82,16 @@ func setupDSCICR(name string) *dsci.DSCInitialization {
 				ManagementState: "Managed",
 				Namespace:       "opendatahub",
 			},
-			TrustedCABundle: dsci.TrustedCABundleSpec{
+			TrustedCABundle: &dsci.TrustedCABundleSpec{
 				ManagementState: "Managed",
 				CustomCABundle:  "",
 			},
-			ServiceMesh: infrav1.ServiceMeshSpec{
+			ServiceMesh: &infrav1.ServiceMeshSpec{
+				ControlPlane: infrav1.ControlPlaneSpec{
+					MetricsCollection: "Istio",
+					Name:              "data-science-smcp",
+					Namespace:         "istio-system",
+				},
 				ManagementState: "Managed",
 			},
 		},
@@ -127,7 +132,7 @@ func setupDSCInstance(name string) *dsc.DataScienceCluster {
 						ManagementState: operatorv1.Managed,
 					},
 					Serving: infrav1.ServingSpec{
-						ManagementState: operatorv1.Unmanaged,
+						ManagementState: operatorv1.Managed,
 					},
 				},
 				CodeFlare: codeflare.CodeFlare{

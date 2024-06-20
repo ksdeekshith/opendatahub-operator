@@ -15,12 +15,14 @@ import (
 )
 
 func (k *Kserve) configureServiceMesh(cli client.Client, dscispec *dsciv1.DSCInitializationSpec) error {
-	if dscispec.ServiceMesh.ManagementState == operatorv1.Managed && k.GetManagementState() == operatorv1.Managed {
-		serviceMeshInitializer := feature.ComponentFeaturesHandler(k.GetComponentName(), dscispec.ApplicationsNamespace, k.defineServiceMeshFeatures(cli, dscispec))
-		return serviceMeshInitializer.Apply()
-	}
-	if dscispec.ServiceMesh.ManagementState == operatorv1.Unmanaged && k.GetManagementState() == operatorv1.Managed {
-		return nil
+	if dscispec.ServiceMesh != nil {
+		if dscispec.ServiceMesh.ManagementState == operatorv1.Managed && k.GetManagementState() == operatorv1.Managed {
+			serviceMeshInitializer := feature.ComponentFeaturesHandler(k.GetComponentName(), dscispec.ApplicationsNamespace, k.defineServiceMeshFeatures(cli, dscispec))
+			return serviceMeshInitializer.Apply()
+		}
+		if dscispec.ServiceMesh.ManagementState == operatorv1.Unmanaged && k.GetManagementState() == operatorv1.Managed {
+			return nil
+		}
 	}
 
 	return k.removeServiceMeshConfigurations(cli, dscispec)
