@@ -1,14 +1,11 @@
 package dscinitialization
 
 import (
-	"context"
 	"fmt"
-	"io/fs"
 	"path"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 
 	dsciv1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
@@ -197,39 +194,25 @@ func (r *DSCInitializationReconciler) authorizationFeatures(dsci *dsciv1.DSCInit
 				).
 				PostConditions(
 					feature.WaitForPodsToBeReady(serviceMeshSpec.ControlPlane.Namespace),
-					// TODO that is another feature...
-					func(f *feature.Feature) error {
-						return feature.WaitForPodsToBeReady(serviceMeshSpec.Auth.Namespace)(f)
-					},
-					func(f *feature.Feature) error {
-						// We do not have the control over deployment resource creation.
-						// It is created by Authorino operator using Authorino CR
-						//
-						// To make it part of Service Mesh we have to patch it with injection
-						// enabled instead, otherwise it will not have proxy pod injected.
-						return ApplyManifest(f, Templates.Location, path.Join(Templates.AuthorinoDir, "deployment.injection.patch.tmpl.yaml"))
-					},
 				).
 				OnDelete(
 					servicemesh.RemoveExtensionProvider,
 				),
+			// We do not have the control over deployment resource creation.
+			// It is created by Authorino operator using Authorino CR and labels are not propagated from Authorino CR to spec.template
+			//
+			// To make it part of Service Mesh we have to patch it with injection
+			// enabled instead, otherwise it will not have proxy pod injected.
+			feature.Define("enable-proxy-injection-in-authorino-deployment").
+				PreConditions(
+					servicemesh.EnsureAuthNamespaceExists,
+					func(f *feature.Feature) error {
+						return feature.WaitForPodsToBeReady(serviceMeshSpec.Auth.Namespace)(f)
+					}).
+				Manifests(
+					manifest.Location(Templates.Location).
+						Include(path.Join(Templates.AuthorinoDir, "deployment.injection.patch.tmpl.yaml")),
+				),
 		)
 	}
-}
-
-// TODO(stack-pr): another feature
-func ApplyManifest(f *feature.Feature, location fs.FS, path string) error {
-	m, err := manifest.LoadManifests(location, path)
-	if err != nil {
-		return err
-	}
-	for i := range m {
-		manifestFile := m[i]
-
-		applier := manifest.CreateApplier(manifestFile)
-		if errApply := applier.Apply(context.TODO(), f.Client, f.Context, feature.MetaOptions(f)...); errApply != nil {
-			return errors.WithStack(errApply)
-		}
-	}
-	return nil
 }
