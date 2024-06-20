@@ -153,8 +153,8 @@ func CreateNamespace(ctx context.Context, cli client.Client, namespace string, m
 	return desiredNamespace, client.IgnoreAlreadyExists(createErr)
 }
 
-// CreateClusterRole creates cluster role based on define PolicyRules and optional metadata fields.
-func CreateClusterRole(ctx context.Context, cli client.Client, name string, rules []authv1.PolicyRule, metaOptions ...MetaOptions) (*authv1.ClusterRole, error) {
+// CreateOrUpdateClusterRole creates cluster role based on define PolicyRules and optional metadata fields and updates the rules if it already exists.
+func CreateOrUpdateClusterRole(ctx context.Context, cli client.Client, name string, rules []authv1.PolicyRule, metaOptions ...MetaOptions) (*authv1.ClusterRole, error) {
 	desiredClusterRole := &authv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -167,16 +167,67 @@ func CreateClusterRole(ctx context.Context, cli client.Client, name string, rule
 	}
 
 	foundClusterRole := &authv1.ClusterRole{}
-	if getErr := cli.Get(ctx, client.ObjectKey{Name: name}, foundClusterRole); client.IgnoreNotFound(getErr) != nil {
-		return nil, getErr
+	err := cli.Get(ctx, client.ObjectKey{Name: desiredClusterRole.GetName()}, foundClusterRole)
+	if apierrs.IsNotFound(err) {
+		return desiredClusterRole, cli.Create(ctx, desiredClusterRole)
 	}
 
-	createErr := cli.Create(ctx, desiredClusterRole)
-	if apierrs.IsAlreadyExists(createErr) {
-		return foundClusterRole, nil
+	if err := ApplyMetaOptions(foundClusterRole, metaOptions...); err != nil {
+		return nil, err
+	}
+	foundClusterRole.Rules = rules
+
+	return foundClusterRole, cli.Update(ctx, foundClusterRole)
+}
+
+// DeleteClusterRole simply calls delete on a ClusterRole with the given name. Any error is returned. Check for IsNotFound.
+func DeleteClusterRole(ctx context.Context, cli client.Client, name string) error {
+	desiredClusterRole := &authv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+	return cli.Delete(ctx, desiredClusterRole)
+}
+
+// CreateOrUpdateClusterRoleBinding creates cluster role bindings based on define PolicyRules and optional metadata fields and updates the bindings if it already exists.
+func CreateOrUpdateClusterRoleBinding(ctx context.Context, cli client.Client, name string, subjects []authv1.Subject, roleRef authv1.RoleRef, metaOptions ...MetaOptions) (*authv1.ClusterRoleBinding, error) {
+	desiredClusterRoleBinding := &authv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Subjects: subjects,
+		RoleRef:  roleRef,
 	}
 
-	return desiredClusterRole, client.IgnoreAlreadyExists(createErr)
+	if err := ApplyMetaOptions(desiredClusterRoleBinding, metaOptions...); err != nil {
+		return nil, err
+	}
+
+	foundClusterRoleBinding := &authv1.ClusterRoleBinding{}
+	err := cli.Get(ctx, client.ObjectKey{Name: desiredClusterRoleBinding.GetName()}, foundClusterRoleBinding)
+	if apierrs.IsNotFound(err) {
+		return desiredClusterRoleBinding, cli.Create(ctx, desiredClusterRoleBinding)
+	}
+
+	if err := ApplyMetaOptions(foundClusterRoleBinding, metaOptions...); err != nil {
+		return nil, err
+	}
+	foundClusterRoleBinding.Subjects = subjects
+	foundClusterRoleBinding.RoleRef = roleRef
+
+	return foundClusterRoleBinding, cli.Update(ctx, foundClusterRoleBinding)
+}
+
+// DeleteClusterRoleBinding simply calls delete on a ClusterRoleBinding with the given name. Any error is returned. Check for IsNotFound.
+func DeleteClusterRoleBinding(ctx context.Context, cli client.Client, name string) error {
+	desiredClusterRoleBinding := &authv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+
+	return cli.Delete(ctx, desiredClusterRoleBinding)
 }
 
 // WaitForDeploymentAvailable to check if component deployment from 'namespace' is ready within 'timeout' before apply prometheus rules for the component.

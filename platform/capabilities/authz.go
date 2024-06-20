@@ -65,12 +65,12 @@ func (a *AuthorizationCapability) IsRequired() bool {
 // Configure enables the Authorization capability and component-specific configuration through registered hooks.
 func (a *AuthorizationCapability) Configure(ctx context.Context, cli client.Client, metaOptions ...cluster.MetaOptions) error {
 	if a.IsRequired() {
-		return CreateOrUpdateAuthzRoleBinding(ctx, cli, a.protectedResources, metaOptions...)
+		return CreateOrUpdateAuthzBindings(ctx, cli, a.protectedResources, metaOptions...)
 	}
 
-	return TryDeleteAuthzRoleBinding(ctx, cli, a.protectedResources)
+	return DeleteAuthzBindings(ctx, cli)
 }
 
 func (a *AuthorizationCapability) Remove(ctx context.Context, cli client.Client) error {
-	return TryDeleteAuthzRoleBinding(ctx, cli, a.protectedResources)
+	return DeleteAuthzBindings(ctx, cli)
 }
