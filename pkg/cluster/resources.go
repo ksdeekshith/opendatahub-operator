@@ -191,7 +191,10 @@ func DeleteClusterRole(ctx context.Context, cli client.Client, name string) erro
 }
 
 // CreateOrUpdateClusterRoleBinding creates cluster role bindings based on define PolicyRules and optional metadata fields and updates the bindings if it already exists.
-func CreateOrUpdateClusterRoleBinding(ctx context.Context, cli client.Client, name string, subjects []authv1.Subject, roleRef authv1.RoleRef, metaOptions ...MetaOptions) (*authv1.ClusterRoleBinding, error) {
+func CreateOrUpdateClusterRoleBinding(ctx context.Context, cli client.Client, name string,
+	subjects []authv1.Subject, roleRef authv1.RoleRef,
+	metaOptions ...MetaOptions) (*authv1.ClusterRoleBinding, error) {
+	
 	desiredClusterRoleBinding := &authv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
