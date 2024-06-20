@@ -26,10 +26,9 @@ var (
 	CodeflareOperator = "codeflare-operator"
 	ParamsPath        = deploy.DefaultManifestPath + "/" + ComponentName + "/manager"
 )
-var (
-	// Verifies that CodeFlare implements ComponentInterface.
-	_ components.ComponentInterface = (*CodeFlare)(nil)
-)
+
+// Verifies that CodeFlare implements ComponentInterface.
+var _ components.ComponentInterface = (*CodeFlare)(nil)
 
 // CodeFlare struct holds the configuration for the CodeFlare component.
 // +kubebuilder:object:generate=true

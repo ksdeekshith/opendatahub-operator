@@ -31,7 +31,7 @@ var (
 	// ).
 )
 
-// Contracts for ModelRegistry component.
+// Verifies that ModelRegistry implements ComponentInterface.
 var _ components.ComponentInterface = (*ModelRegistry)(nil)
 
 // ModelRegistry struct holds the configuration for the ModelRegistry component.
