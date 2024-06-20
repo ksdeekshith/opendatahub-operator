@@ -47,7 +47,7 @@ type Feature struct {
 	tracker *featurev1.FeatureTracker
 	source  *featurev1.Source
 
-	Context map[string]any
+	data map[string]any
 
 	resources []builder.ResourceApplier
 
@@ -140,7 +140,7 @@ func (f *Feature) applyFeature() error {
 
 	for i := range f.resources {
 		r := f.resources[i]
-		if processErr := r.Apply(context.TODO(), f.Client, f.Context, MetaOptions(f)...); processErr != nil {
+		if processErr := r.Apply(context.TODO(), f.Client, f.data, MetaOptions(f)...); processErr != nil {
 			return &withConditionReasonError{reason: featurev1.ConditionReason.ApplyManifests, err: processErr}
 		}
 	}

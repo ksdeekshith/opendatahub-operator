@@ -51,7 +51,7 @@ func Define(featureName string) *featureBuilder { //nolint:golint,revive //No ne
 		return nil
 	}
 
-	// Ensures creation of shared Context is always invoked first
+	// Ensures creation of shared data is always invoked first
 	fb.builders = append([]partialBuilder{initializeContext}, fb.builders...)
 
 	return fb
