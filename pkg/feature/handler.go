@@ -11,6 +11,7 @@ import (
 	v1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
 	featurev1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/features/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/controllers/status"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/kustomize"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/plugins"
 )
 
@@ -50,7 +51,7 @@ func (fh *FeaturesHandler) Add(builders ...*featureBuilder) error {
 		fb := builders[i]
 		feature, err := fb.TargetNamespace(fh.targetNamespace).
 			Source(fh.source).
-			Kustomize().GlobalPlugins(globalPlugins...).
+			EnrichManifests(&kustomize.PluginsEnricher{Plugins: globalPlugins}).
 			Create()
 		featureAddErrors = multierror.Append(featureAddErrors, err)
 		fh.features = append(fh.features, feature)

@@ -6,26 +6,12 @@ import (
 
 	"github.com/spf13/afero"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/kustomize/kyaml/filesys"
 
-	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/manifest"
-	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/plugins"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
-
-var _ fs.FS = (*AferoFsAdapter)(nil)
-
-type AferoFsAdapter struct {
-	Afs afero.Fs
-}
-
-// Open adapts the Open method to comply with fs.FS interface.
-func (a AferoFsAdapter) Open(name string) (fs.File, error) {
-	return a.Afs.Open(name)
-}
 
 var _ = Describe("Manifest Processing", func() {
 	var (
@@ -34,9 +20,7 @@ var _ = Describe("Manifest Processing", func() {
 	)
 
 	BeforeEach(func() {
-		fSys := afero.NewMemMapFs()
-		inMemFS = AferoFsAdapter{Afs: fSys}
-
+		inMemFS = AferoFsAdapter{afero.NewMemMapFs()}
 	})
 
 	Describe("Raw Manifest Processing", func() {
@@ -51,20 +35,19 @@ data:
  key: value
 `
 			path = "path/to/test.yaml"
-			err := afero.WriteFile(inMemFS.Afs, path, []byte(resourceYaml), 0644)
+			err := afero.WriteFile(inMemFS.Fs, path, []byte(resourceYaml), 0644)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("should Process the raw manifest with no substitutions", func() {
 			// given
-			manifests := []*manifest.Manifest{manifest.Create(inMemFS, path)}
 			data := struct{ TargetNamespace string }{
 				TargetNamespace: "not-used",
 			}
 
 			// when
 			// Simulate adding to and processing from a slice of Manifest interfaces
-			objs := processManifests(data, manifests)
+			objs := process(data, manifest.Create(inMemFS, path))
 
 			Expect(objs).To(HaveLen(1))
 			Expect(objs[0].GetKind()).To(Equal("ConfigMap"))
@@ -84,14 +67,14 @@ data:
 `
 		BeforeEach(func() {
 			path = "path/to/template.tmpl.yaml"
-			err := afero.WriteFile(inMemFS.Afs, path, []byte(resourceYaml), 0644)
+			err := afero.WriteFile(inMemFS.Fs, path, []byte(resourceYaml), 0644)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("should fail when template refers to non existing key", func() {
 			// given
 			pathToBrokenTpl := filepath.Join("broken", path)
-			Expect(afero.WriteFile(inMemFS.Afs, pathToBrokenTpl, []byte(resourceYaml+"\n {{ .NotExistingKey }}"), 0644)).To(Succeed())
+			Expect(afero.WriteFile(inMemFS.Fs, pathToBrokenTpl, []byte(resourceYaml+"\n {{ .NotExistingKey }}"), 0644)).To(Succeed())
 			data := map[string]string{
 				"TargetNamespace": "template-ns",
 			}
@@ -106,14 +89,13 @@ data:
 
 		It("should substitute target namespace in the templated manifest", func() {
 			// given
-			manifests := []*manifest.Manifest{manifest.Create(inMemFS, path)}
 			data := struct{ TargetNamespace string }{
 				TargetNamespace: "template-ns",
 			}
 
 			// when
 			// Simulate adding to and processing from a slice of Manifest interfaces
-			objs := processManifests(data, manifests)
+			objs := process(data, manifest.Create(inMemFS, path))
 
 			// then
 			Expect(objs).To(HaveLen(1))
@@ -124,57 +106,9 @@ data:
 
 	})
 
-	Describe("Kustomize Manifest Processing", func() {
-
-		BeforeEach(func() {
-			path = "/path/to/kustomization/"
-		})
-
-		It("should Process the ConfigMap resource from the kustomize manifest", func() {
-			// given
-			kustomizationYaml := `
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-resources:
-- resources.yaml
-`
-			resourceYaml := `
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: my-configmap
-data:
-  key: value
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: my-other-configmap
-data:
-  key: value
-`
-			kustFsys := filesys.MakeFsInMemory()
-
-			Expect(kustFsys.WriteFile(filepath.Join(path, "kustomization.yaml"), []byte(kustomizationYaml))).To(Succeed())
-			Expect(kustFsys.WriteFile(filepath.Join(path, "resources.yaml"), []byte(resourceYaml))).To(Succeed())
-			manifest := feature.CreateKustomizeManifest(kustFsys, "/path/to/kustomization/", plugins.CreateNamespaceApplierPlugin("kust-ns"))
-
-			// when
-			manifests := []*feature.KustomizeManifest{manifest}
-			objs := processKustomize(manifests)
-
-			// then
-			Expect(objs).To(HaveLen(2))
-			configMap := objs[0]
-			Expect(configMap.GetKind()).To(Equal("ConfigMap"))
-			Expect(configMap.GetName()).To(Equal("my-configmap"))
-			Expect(configMap.GetNamespace()).To(Equal("kust-ns"))
-		})
-	})
-
 })
 
-func processManifests(data any, m []*manifest.Manifest) []*unstructured.Unstructured {
+func process(data any, m ...*manifest.Manifest) []*unstructured.Unstructured {
 	var objs []*unstructured.Unstructured
 	var err error
 	for i := range m {
@@ -187,15 +121,13 @@ func processManifests(data any, m []*manifest.Manifest) []*unstructured.Unstruct
 	return objs
 }
 
-func processKustomize(m []*feature.KustomizeManifest) []*unstructured.Unstructured {
-	var objs []*unstructured.Unstructured
-	var err error
-	for i := range m {
-		objs, err = m[i].Process()
-		if err != nil {
-			break
-		}
-	}
-	Expect(err).NotTo(HaveOccurred())
-	return objs
+var _ fs.FS = (*AferoFsAdapter)(nil)
+
+type AferoFsAdapter struct {
+	afero.Fs
+}
+
+// Open adapts the Open method to comply with fs.FS interface.
+func (a AferoFsAdapter) Open(name string) (fs.File, error) {
+	return a.Fs.Open(name)
 }

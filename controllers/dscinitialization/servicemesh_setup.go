@@ -1,17 +1,21 @@
 package dscinitialization
 
 import (
+	"context"
 	"fmt"
+	"io/fs"
 	"path"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 
 	dsciv1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/controllers/status"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/manifest"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/servicemesh"
 )
 
@@ -118,12 +122,12 @@ func (r *DSCInitializationReconciler) serviceMeshCapabilityFeatures(dsci *dsciv1
 		serviceMeshSpec := dsci.Spec.ServiceMesh
 
 		smcp := feature.Define("mesh-control-plane-creation").
-			Manifests().
-			Location(Templates.Location).
-			Paths(
-				path.Join(Templates.ServiceMeshDir),
+			Manifests(
+				manifest.Location(Templates.Location).
+					Include(
+						path.Join(Templates.ServiceMeshDir),
+					),
 			).
-			Done().
 			WithData(servicemesh.FeatureData.ControlPlane.Create(&dsci.Spec).AsAction()).
 			PreConditions(
 				servicemesh.EnsureServiceMeshOperatorInstalled,
@@ -135,12 +139,12 @@ func (r *DSCInitializationReconciler) serviceMeshCapabilityFeatures(dsci *dsciv1
 
 		if serviceMeshSpec.ControlPlane.MetricsCollection == "Istio" {
 			metricsCollectionErr := registry.Add(feature.Define("mesh-metrics-collection").
-				Manifests().
-				Location(Templates.Location).
-				Paths(
-					path.Join(Templates.MetricsDir),
+				Manifests(
+					manifest.Location(Templates.Location).
+						Include(
+							path.Join(Templates.MetricsDir),
+						),
 				).
-				Done().
 				WithData(
 					servicemesh.FeatureData.ControlPlane.Create(&dsci.Spec).AsAction(),
 				).
@@ -172,14 +176,14 @@ func (r *DSCInitializationReconciler) authorizationFeatures(dsci *dsciv1.DSCInit
 
 		return registry.Add(
 			feature.Define("mesh-control-plane-external-authz").
-				Manifests().
-				Location(Templates.Location).
-				Paths(
-					path.Join(Templates.AuthorinoDir, "auth-smm.tmpl.yaml"),
-					path.Join(Templates.AuthorinoDir, "base"),
-					path.Join(Templates.AuthorinoDir, "mesh-authz-ext-provider.patch.tmpl.yaml"),
+				Manifests(
+					manifest.Location(Templates.Location).
+						Include(
+							path.Join(Templates.AuthorinoDir, "auth-smm.tmpl.yaml"),
+							path.Join(Templates.AuthorinoDir, "base"),
+							path.Join(Templates.AuthorinoDir, "mesh-authz-ext-provider.patch.tmpl.yaml"),
+						),
 				).
-				Done().
 				WithData(
 					servicemesh.FeatureData.ControlPlane.Create(&dsci.Spec).AsAction(),
 				).
@@ -193,6 +197,7 @@ func (r *DSCInitializationReconciler) authorizationFeatures(dsci *dsciv1.DSCInit
 				).
 				PostConditions(
 					feature.WaitForPodsToBeReady(serviceMeshSpec.ControlPlane.Namespace),
+					// TODO that is another feature...
 					func(f *feature.Feature) error {
 						return feature.WaitForPodsToBeReady(serviceMeshSpec.Auth.Namespace)(f)
 					},
@@ -202,7 +207,7 @@ func (r *DSCInitializationReconciler) authorizationFeatures(dsci *dsciv1.DSCInit
 						//
 						// To make it part of Service Mesh we have to patch it with injection
 						// enabled instead, otherwise it will not have proxy pod injected.
-						return f.ApplyManifest(Templates.Location, path.Join(Templates.AuthorinoDir, "deployment.injection.patch.tmpl.yaml"))
+						return ApplyManifest(f, Templates.Location, path.Join(Templates.AuthorinoDir, "deployment.injection.patch.tmpl.yaml"))
 					},
 				).
 				OnDelete(
@@ -210,4 +215,21 @@ func (r *DSCInitializationReconciler) authorizationFeatures(dsci *dsciv1.DSCInit
 				),
 		)
 	}
+}
+
+// TODO(stack-pr): another feature
+func ApplyManifest(f *feature.Feature, location fs.FS, path string) error {
+	m, err := manifest.LoadManifests(location, path)
+	if err != nil {
+		return err
+	}
+	for i := range m {
+		manifestFile := m[i]
+
+		applier := manifest.CreateApplier(manifestFile)
+		if errApply := applier.Apply(context.TODO(), f.Client, f.Context, feature.MetaOptions(f)...); errApply != nil {
+			return errors.WithStack(errApply)
+		}
+	}
+	return nil
 }

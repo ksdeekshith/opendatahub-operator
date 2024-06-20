@@ -16,8 +16,6 @@ import (
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 )
 
-type ApplierFunc func(ctx context.Context, cli client.Client, objects []*unstructured.Unstructured, options ...cluster.MetaOptions) error
-
 func Create(fsys fs.FS, path string) *Manifest {
 	basePath := filepath.Base(path)
 	return &Manifest{
@@ -65,39 +63,30 @@ type Manifest struct {
 
 // Applier wraps an instance of Manifest and provides a way to apply it to the cluster.
 type Applier struct {
-	ctx         context.Context
-	cli         client.Client
-	options     []cluster.MetaOptions
-	applierFunc ApplierFunc
-	manifest    *Manifest
-	data        any
+	manifest *Manifest
 }
 
-func CreateApplier(ctx context.Context, cli client.Client, manifest *Manifest, data any, options ...cluster.MetaOptions) *Applier {
-	applierFunc := cluster.ApplyResources
-	if isPatch(manifest.path) {
-		applierFunc = func(ctx context.Context, cli client.Client, objects []*unstructured.Unstructured, _ ...cluster.MetaOptions) error {
-			return cluster.PatchResources(ctx, cli, objects)
-		}
-	}
+func CreateApplier(manifest *Manifest) *Applier {
 	return &Applier{
-		ctx:         ctx,
-		cli:         cli,
-		options:     options,
-		applierFunc: applierFunc,
-		manifest:    manifest,
-		data:        data,
+		manifest: manifest,
 	}
 }
 
 // Apply processes owned manifest and apply it to a cluster.
-func (a *Applier) Apply() error {
-	objects, errProcess := a.manifest.Process(a.data)
+func (a Applier) Apply(ctx context.Context, cli client.Client, data map[string]any, options ...cluster.MetaOptions) error {
+	objects, errProcess := a.manifest.Process(data)
 	if errProcess != nil {
 		return errProcess
 	}
 
-	return a.applierFunc(a.ctx, a.cli, objects, a.options...)
+	applierFunc := cluster.ApplyResources
+	if isPatch(a.manifest.path) {
+		applierFunc = func(ctx context.Context, cli client.Client, objects []*unstructured.Unstructured, _ ...cluster.MetaOptions) error {
+			return cluster.PatchResources(ctx, cli, objects)
+		}
+	}
+
+	return applierFunc(ctx, cli, objects, options...)
 }
 
 // Process allows any arbitrary struct to be passed and used while processing the content of the manifest.

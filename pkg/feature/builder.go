@@ -2,7 +2,6 @@ package feature
 
 import (
 	"fmt"
-	"io/fs"
 
 	"github.com/hashicorp/go-multierror"
 	ofapiv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -13,11 +12,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/kustomize/api/resmap"
-	"sigs.k8s.io/kustomize/kyaml/filesys"
 
 	featurev1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/features/v1"
-	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/manifest"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/builder"
 )
 
 type partialBuilder func(f *Feature) error
@@ -30,9 +27,8 @@ type featureBuilder struct {
 
 	config *rest.Config
 
-	globalPlugins []resmap.Transformer
-
-	builders []partialBuilder
+	builders  []partialBuilder
+	enrichers []builder.ResourceBuilderEnricher
 }
 
 // Define creates a new feature builder with the given name.
@@ -55,7 +51,7 @@ func Define(featureName string) *featureBuilder { //nolint:golint,revive //No ne
 		return nil
 	}
 
-	// Ensures creation of shared context is always invoked first
+	// Ensures creation of shared Context is always invoked first
 	fb.builders = append([]partialBuilder{initializeContext}, fb.builders...)
 
 	return fb
@@ -74,105 +70,36 @@ func (fb *featureBuilder) Source(source featurev1.Source) *featureBuilder {
 	return fb
 }
 
-type ManifestBuilder interface {
-	Location(fsys fs.FS) ManifestBuilder
-	Paths(paths ...string) ManifestBuilder
-	Done() *featureBuilder
-}
-
-type manifestSubBuilder struct {
-	*featureBuilder
-	manifestLocation fs.FS
-	paths            []string
-}
-
-var _ ManifestBuilder = (*manifestSubBuilder)(nil)
-
-// Manifests is entry to manifest sub-builder fluent interface.
-func (fb *featureBuilder) Manifests() ManifestBuilder { //nolint:ireturn //reason narrowing func chain
-	return &manifestSubBuilder{featureBuilder: fb}
-}
-
-// Location sets the root file system from which manifest paths are loaded.
-func (mb *manifestSubBuilder) Location(fsys fs.FS) ManifestBuilder { //nolint:ireturn //reason narrowing func chain
-	mb.manifestLocation = fsys
-	return mb
-}
-
-// Paths loads manifests from the provided paths.
-func (mb *manifestSubBuilder) Paths(paths ...string) ManifestBuilder { //nolint:ireturn //reason narrowing func chain
-	mb.paths = append(mb.paths, paths...)
-	return mb
-}
-
-// Done is a terminal method of this sub-builder allowing going up the call chain to the owning builder.
-func (mb *manifestSubBuilder) Done() *featureBuilder {
-	mb.builders = append(mb.builders, func(f *Feature) error {
-		var err error
-		var manifests []*manifest.Manifest
-
-		for _, path := range mb.paths {
-			manifests, err = manifest.LoadManifests(mb.manifestLocation, path)
-			if err != nil {
-				return errors.WithStack(err)
+// Manifests allow to compose manifests using different implementation of builders such as those defined in manifest and kustomize packages.
+func (fb *featureBuilder) Manifests(resourceBuilders ...builder.ResourceBuilder) *featureBuilder {
+	for _, b := range resourceBuilders {
+		fb.builders = append(fb.builders, func(f *Feature) error {
+			for _, enricher := range fb.enrichers {
+				enricher.Enrich(b)
 			}
 
-			f.manifests = append(f.manifests, manifests...)
-		}
+			resources, errCreate := b.Create()
+			if errCreate != nil {
+				return errCreate
+			}
 
-		return nil
-	})
+			f.resources = append(f.resources, resources...)
 
-	return mb.featureBuilder
+			return nil
+		})
+	}
+
+	return fb
 }
 
-type KustomizeBuilder interface {
-	Location(location string) KustomizeBuilder
-	Plugins(plugins ...resmap.Transformer) KustomizeBuilder
-	Done() *featureBuilder
-}
+// EnrichManifests allow to add enrichers which can enhance resource builders with additional setup, such
+// as defaulting certain properties or adding shared fixtures which very builder needs. Though these can be set using
+// each builder specifically, providing an enricher ensures it will be uniformly applied to each relevant builder and reduce
+// code duplication.
+func (fb *featureBuilder) EnrichManifests(enrichers ...builder.ResourceBuilderEnricher) *featureBuilder {
+	fb.enrichers = append(fb.enrichers, enrichers...)
 
-type kustomizeSubBuilder struct {
-	*featureBuilder
-	kustomizeLocation string
-	plugins           []resmap.Transformer
-}
-
-var _ KustomizeBuilder = (*kustomizeSubBuilder)(nil)
-
-// Kustomize allow defining manifest source to be applied using kustomize tool.
-func (fb *featureBuilder) Kustomize() *kustomizeSubBuilder {
-	return &kustomizeSubBuilder{featureBuilder: fb}
-}
-
-// GlobalPlugins will be applied to each kustomize manifest being part of the defined feature.
-func (kb *kustomizeSubBuilder) GlobalPlugins(plugins ...resmap.Transformer) *featureBuilder {
-	kb.featureBuilder.globalPlugins = append(kb.featureBuilder.globalPlugins, plugins...)
-	return kb.featureBuilder
-}
-
-// Location of kustomization.yaml file to be used to determine resources to be applied.
-func (kb *kustomizeSubBuilder) Location(location string) KustomizeBuilder { //nolint:ireturn //reason narrowing func chain
-	kb.kustomizeLocation = location
-	return kb
-}
-
-// Plugins let adding transformers for the generated resources.
-func (kb *kustomizeSubBuilder) Plugins(plugins ...resmap.Transformer) KustomizeBuilder { //nolint:ireturn //reason narrowing func chain
-	kb.plugins = append(kb.plugins, plugins...)
-	return kb
-}
-
-// Done is a terminal method of this sub-builder allowing going up the call chain to the owning builder.
-func (kb *kustomizeSubBuilder) Done() *featureBuilder {
-	kb.featureBuilder.builders = append(kb.featureBuilder.builders, func(f *Feature) error {
-		m := CreateKustomizeManifest(filesys.MakeFsOnDisk(), kb.kustomizeLocation, kb.plugins...)
-		m.plugins = append(m.plugins, kb.globalPlugins...)
-		f.kustomizeManifests = append(f.kustomizeManifests, m)
-		return nil
-	})
-
-	return kb.featureBuilder
+	return fb
 }
 
 // Managed marks the feature as managed by the operator.  This effectively marks all resources which are part of this feature
@@ -199,7 +126,7 @@ func (fb *featureBuilder) WithData(dataProviders ...Action) *featureBuilder {
 // WithResources allows to define programmatically which resources should be created when applying defined Feature.
 func (fb *featureBuilder) WithResources(resources ...Action) *featureBuilder {
 	fb.builders = append(fb.builders, func(f *Feature) error {
-		f.resources = resources
+		f.clusterOperations = resources
 
 		return nil
 	})

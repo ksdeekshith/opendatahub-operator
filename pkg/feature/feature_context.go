@@ -20,7 +20,7 @@ type ContextEntry[T any] struct {
 	Value provider.DataProviderFunc[T]
 }
 
-// ContextDefinition defines how the data is created and fetched from the Feature's context.
+// ContextDefinition defines how the data is created and fetched from the Feature's Context.
 type ContextDefinition[S, T any] struct {
 	// Create is a factory function to create a Feature's ContextEntry from the given source.
 	Create func(source *S) ContextEntry[T]
@@ -28,7 +28,7 @@ type ContextDefinition[S, T any] struct {
 	From func(f *Feature) (T, error)
 }
 
-// ExtractEntry is a template for defining a function to extract a value from the Feature's context using defined key.
+// ExtractEntry is a template for defining a function to extract a value from the Feature's Context using defined key.
 func ExtractEntry[T any](key string) func(f *Feature) (T, error) {
 	return func(f *Feature) (T, error) {
 		return Get[T](f, key)
@@ -52,31 +52,31 @@ func addToContextFromProvider[T any](key string, provider provider.DataProviderF
 	}
 }
 
-// Get allows to retrieve arbitrary value from the Feature's context.
+// Get allows to retrieve arbitrary value from the Feature's Context.
 func Get[T any](f *Feature, key string) (T, error) { //nolint:ireturn //Reason generic type
 	var data T
 	var ok bool
 
-	input, found := f.context[key]
+	input, found := f.Context[key]
 	if !found {
 		return data, fmt.Errorf("key %s not found", key)
 	}
 
 	data, ok = input.(T)
 	if !ok {
-		return data, fmt.Errorf("invalid type %T", f.context[key])
+		return data, fmt.Errorf("invalid type %T", f.Context[key])
 	}
 
 	return data, nil
 }
 
-// Set allows to store a value under given key in the Feature's context.
+// Set allows to store a value under given key in the Feature's data.
 func (f *Feature) Set(key string, data any) error {
-	if f.context == nil {
-		f.context = map[string]any{}
+	if f.Context == nil {
+		f.Context = map[string]any{}
 	}
 
-	f.context[key] = data
+	f.Context[key] = data
 
 	return nil
 }

@@ -11,6 +11,7 @@ import (
 	dsciv1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/kustomize"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/metadata/labels"
 )
 
@@ -117,9 +118,7 @@ func (r *Registry) definePlatformDeployment() feature.FeaturesProvider {
 	return func(registry feature.FeaturesRegistry) error {
 		return registry.Add(
 			feature.Define("deploy-odh-platform").
-				Kustomize().
-				Location("/opt/manifests/platform/default").
-				Done(),
+				Manifests(kustomize.Location("/opt/manifests/platform/default")),
 		)
 	}
 }

@@ -1,18 +1,22 @@
-package feature
+package kustomize
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kustomize/api/krusty"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 	"sigs.k8s.io/yaml"
+
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 )
 
-func CreateKustomizeManifest(fsys filesys.FileSystem, path string, plugins ...resmap.Transformer) *KustomizeManifest {
-	return &KustomizeManifest{
+func Create(fsys filesys.FileSystem, path string, plugins ...resmap.Transformer) *Kustomization {
+	return &Kustomization{
 		name:    filepath.Base(path),
 		path:    path,
 		fsys:    fsys,
@@ -20,16 +24,16 @@ func CreateKustomizeManifest(fsys filesys.FileSystem, path string, plugins ...re
 	}
 }
 
-// KustomizeManifest supports paths to kustomization files / directories containing a kustomization file
+// Kustomization supports paths to kustomization files / directories containing a kustomization file
 // note that it only supports to paths within the mounted files ie: /opt/manifests.
-type KustomizeManifest struct {
+type Kustomization struct {
 	name,
 	path string
 	fsys    filesys.FileSystem
 	plugins []resmap.Transformer
 }
 
-func (k *KustomizeManifest) Process() ([]*unstructured.Unstructured, error) {
+func (k *Kustomization) Process() ([]*unstructured.Unstructured, error) {
 	kustomizer := krusty.MakeKustomizer(krusty.MakeDefaultOptions())
 
 	resMap, errRes := kustomizer.Run(k.fsys, k.path)
@@ -44,6 +48,27 @@ func (k *KustomizeManifest) Process() ([]*unstructured.Unstructured, error) {
 	}
 
 	return convertToUnstructuredObjects(resMap)
+}
+
+// Applier wraps an instance of Manifest and provides a way to apply it to the cluster.
+type Applier struct {
+	kustomization *Kustomization
+}
+
+func CreateApplier(manifest *Kustomization) *Applier {
+	return &Applier{
+		kustomization: manifest,
+	}
+}
+
+// Apply processes owned manifest and apply it to a cluster.
+func (a Applier) Apply(ctx context.Context, cli client.Client, _ map[string]any, options ...cluster.MetaOptions) error {
+	objects, errProcess := a.kustomization.Process()
+	if errProcess != nil {
+		return errProcess
+	}
+
+	return cluster.ApplyResources(ctx, cli, objects, options...)
 }
 
 func convertToUnstructuredObjects(resMap resmap.ResMap) ([]*unstructured.Unstructured, error) {

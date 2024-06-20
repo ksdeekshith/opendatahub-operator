@@ -23,6 +23,7 @@ import (
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 )
 
+// TODO(stack-pr): move to cluster pkg - unrelated to features now
 func CreateSelfSignedCertificate(ctx context.Context, c client.Client, secretName string,
 	certificateType infrav1.CertType, domain, namespace string, options ...cluster.MetaOptions) error {
 	if certificateType != infrav1.SelfSigned {

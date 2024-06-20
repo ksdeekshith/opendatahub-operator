@@ -10,6 +10,7 @@ import (
 	dsciv1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/manifest"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/provider"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/metadata/annotations"
 	"github.com/opendatahub-io/opendatahub-operator/v2/tests/envtestutil"
@@ -50,10 +51,10 @@ var _ = Describe("Applying and updating resources", func() {
 					feature.Define("create-local-gw-svc").
 						UsingConfig(envTest.Config).
 						Managed().
-						Manifests().
-						Location(fixtures.TestEmbeddedFiles).
-						Paths(path.Join(fixtures.BaseDir, "local-gateway-svc.tmpl.yaml")).
-						Done().
+						Manifests(
+							manifest.Location(fixtures.TestEmbeddedFiles).
+								Include(path.Join(fixtures.BaseDir, "local-gateway-svc.tmpl.yaml")),
+						).
 						WithData(feature.Entry("ControlPlane", provider.ValueOf(dsci.Spec.ServiceMesh.ControlPlane).Get)),
 				)
 			})
@@ -81,10 +82,10 @@ var _ = Describe("Applying and updating resources", func() {
 				return registry.Add(
 					feature.Define("create-local-gw-svc").
 						UsingConfig(envTest.Config).
-						Manifests().
-						Location(fixtures.TestEmbeddedFiles).
-						Paths(path.Join(fixtures.BaseDir, "local-gateway-svc.tmpl.yaml")).
-						Done().
+						Manifests(
+							manifest.Location(fixtures.TestEmbeddedFiles).
+								Include(path.Join(fixtures.BaseDir, "local-gateway-svc.tmpl.yaml")),
+						).
 						WithData(feature.Entry("ControlPlane", provider.ValueOf(dsci.Spec.ServiceMesh.ControlPlane).Get)),
 				)
 			})
@@ -108,10 +109,10 @@ var _ = Describe("Applying and updating resources", func() {
 				return registry.Add(
 					feature.Define("create-managed-svc").
 						UsingConfig(envTest.Config).
-						Manifests().
-						Location(fixtures.TestEmbeddedFiles).
-						Paths(path.Join(fixtures.BaseDir, "managed-svc.yaml")).
-						Done().
+						Manifests(
+							manifest.Location(fixtures.TestEmbeddedFiles).
+								Include(path.Join(fixtures.BaseDir, "managed-svc.yaml")),
+						).
 						WithData(feature.Entry("ControlPlane", provider.ValueOf(dsci.Spec.ServiceMesh.ControlPlane).Get)),
 				)
 			})

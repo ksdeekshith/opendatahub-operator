@@ -15,6 +15,7 @@ import (
 	infrav1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/infrastructure/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster/gvk"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/manifest"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/provider"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/servicemesh"
 	"github.com/opendatahub-io/opendatahub-operator/v2/tests/envtestutil"
@@ -200,10 +201,10 @@ var _ = Describe("Service Mesh setup", func() {
 					handler := feature.ClusterFeaturesHandler(dsci, func(registry feature.FeaturesRegistry) error {
 						return registry.Add(feature.Define("control-plane-with-external-authz-provider").
 							UsingConfig(envTest.Config).
-							Manifests().
-							Location(fixtures.TestEmbeddedFiles).
-							Paths(path.Join("templates", "mesh-authz-ext-provider.patch.tmpl.yaml")).
-							Done().
+							Manifests(
+								manifest.Location(fixtures.TestEmbeddedFiles).
+									Include(path.Join("templates", "mesh-authz-ext-provider.patch.tmpl.yaml")),
+							).
 							WithData(
 								servicemesh.FeatureData.Authorization.All(&dsci.Spec)...,
 							).

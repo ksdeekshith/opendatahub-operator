@@ -3,18 +3,16 @@ package feature
 import (
 	"context"
 	"fmt"
-	"io/fs"
 
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	featurev1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/features/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/controllers/status"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
-	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/manifest"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/builder"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/metadata/annotations"
 )
 
@@ -49,15 +47,15 @@ type Feature struct {
 	tracker *featurev1.FeatureTracker
 	source  *featurev1.Source
 
-	context            map[string]any
-	manifests          []*manifest.Manifest
-	kustomizeManifests []*KustomizeManifest
+	Context map[string]any
 
-	cleanups       []Action
-	resources      []Action
-	preconditions  []Action
-	postconditions []Action
-	dataProviders  []Action
+	resources []builder.ResourceApplier
+
+	cleanups          []Action
+	clusterOperations []Action
+	preconditions     []Action
+	postconditions    []Action
+	dataProviders     []Action
 }
 
 // Action is a func type which can be used for different purposes while having access to the owning Feature struct.
@@ -85,27 +83,6 @@ func (f *Feature) Apply() error {
 	_, reportErr := createFeatureTrackerStatusReporter(f).ReportCondition(applyErr)
 
 	return multierror.Append(applyErr, reportErr).ErrorOrNil()
-}
-
-// ApplyManifest applies the resources from defined manifest paths immediately.
-func (f *Feature) ApplyManifest(location fs.FS, path string) error {
-	m, err := manifest.LoadManifests(location, path)
-	if err != nil {
-		return err
-	}
-	for i := range m {
-		manifestFile := m[i]
-		metaOptions := []cluster.MetaOptions{OwnedBy(f)}
-		if f.Managed {
-			metaOptions = append(metaOptions, cluster.WithAnnotations(annotations.ManagedByODHOperator, "true"))
-		}
-
-		applier := manifest.CreateApplier(context.TODO(), f.Client, manifestFile, f.context, metaOptions...)
-		if errApply := applier.Apply(); errApply != nil {
-			return errors.WithStack(errApply)
-		}
-	}
-	return nil
 }
 
 // Cleanup removes all resources associated with the feature and invokes any cleanup functions defined as part of the Feature.
@@ -144,8 +121,8 @@ func (f *Feature) applyFeature() error {
 	for _, dataProvider := range f.dataProviders {
 		multiErr = multierror.Append(multiErr, dataProvider(f))
 	}
-	if dataLoadErr := multiErr.ErrorOrNil(); dataLoadErr != nil {
-		return &withConditionReasonError{reason: featurev1.ConditionReason.LoadTemplateData, err: dataLoadErr}
+	if errDataLoader := multiErr.ErrorOrNil(); errDataLoader != nil {
+		return &withConditionReasonError{reason: featurev1.ConditionReason.LoadTemplateData, err: errDataLoader}
 	}
 
 	for _, precondition := range f.preconditions {
@@ -155,35 +132,16 @@ func (f *Feature) applyFeature() error {
 		return &withConditionReasonError{reason: featurev1.ConditionReason.PreConditions, err: preconditionsErr}
 	}
 
-	for _, resource := range f.resources {
-		if resourceCreateErr := resource(f); resourceCreateErr != nil {
-			return &withConditionReasonError{reason: featurev1.ConditionReason.ResourceCreation, err: resourceCreateErr}
+	for _, clusterOperation := range f.clusterOperations {
+		if errClusterOperation := clusterOperation(f); errClusterOperation != nil {
+			return &withConditionReasonError{reason: featurev1.ConditionReason.ResourceCreation, err: errClusterOperation}
 		}
 	}
 
-	manifestsMeta := []cluster.MetaOptions{OwnedBy(f)}
-	if f.Managed {
-		manifestsMeta = append(manifestsMeta, cluster.WithAnnotations(annotations.ManagedByODHOperator, "true"))
-	}
-	for i := range f.manifests {
-		m := f.manifests[i]
-		applier := manifest.CreateApplier(context.TODO(), f.Client, m, f.context, manifestsMeta...)
-		if processErr := applier.Apply(); processErr != nil {
+	for i := range f.resources {
+		r := f.resources[i]
+		if processErr := r.Apply(context.TODO(), f.Client, f.Context, MetaOptions(f)...); processErr != nil {
 			return &withConditionReasonError{reason: featurev1.ConditionReason.ApplyManifests, err: processErr}
-		}
-	}
-
-	for i := range f.kustomizeManifests {
-		kustomizeManifest := f.kustomizeManifests[i]
-
-		// TODO rework to APPLY
-		objs, processErr := kustomizeManifest.Process()
-		if processErr != nil {
-			return &withConditionReasonError{reason: featurev1.ConditionReason.ApplyManifests, err: processErr}
-		}
-
-		if err := cluster.ApplyResources(context.TODO(), f.Client, objs, manifestsMeta...); err != nil {
-			return &withConditionReasonError{reason: featurev1.ConditionReason.ApplyManifests, err: err}
 		}
 	}
 
@@ -204,5 +162,16 @@ func (f *Feature) AsOwnerReference() metav1.OwnerReference {
 
 // OwnedBy returns a cluster.MetaOptions that sets the owner reference to the FeatureTracker resource.
 func OwnedBy(f *Feature) cluster.MetaOptions {
-	return cluster.WithOwnerReference(f.AsOwnerReference())
+	return func(obj metav1.Object) error {
+		obj.SetOwnerReferences([]metav1.OwnerReference{f.AsOwnerReference()})
+		return nil
+	}
+}
+
+func MetaOptions(f *Feature) []cluster.MetaOptions {
+	resourceMeta := []cluster.MetaOptions{OwnedBy(f)}
+	if f.Managed {
+		resourceMeta = append(resourceMeta, cluster.WithAnnotations(annotations.ManagedByODHOperator, "true"))
+	}
+	return resourceMeta
 }

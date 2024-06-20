@@ -5,6 +5,7 @@ import (
 
 	dsciv1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature"
+	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/manifest"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/serverless"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/servicemesh"
 )
@@ -12,12 +13,12 @@ import (
 func (k *Kserve) configureServerlessFeatures(dsciSpec *dsciv1.DSCInitializationSpec) feature.FeaturesProvider {
 	return func(registry feature.FeaturesRegistry) error {
 		servingDeployment := feature.Define("serverless-serving-deployment").
-			Manifests().
-			Location(Resources.Location).
-			Paths(
-				path.Join(Resources.InstallDir),
+			Manifests(
+				manifest.Location(Resources.Location).
+					Include(
+						path.Join(Resources.InstallDir),
+					),
 			).
-			Done().
 			WithData(
 				serverless.FeatureData.IngressDomain.Create(&k.Serving).AsAction(),
 				serverless.FeatureData.Serving.Create(&k.Serving).AsAction(),
@@ -34,12 +35,12 @@ func (k *Kserve) configureServerlessFeatures(dsciSpec *dsciv1.DSCInitializationS
 			)
 
 		istioSecretFiltering := feature.Define("serverless-net-istio-secret-filtering").
-			Manifests().
-			Location(Resources.Location).
-			Paths(
-				path.Join(Resources.BaseDir, "serving-net-istio-secret-filtering.patch.tmpl.yaml"),
+			Manifests(
+				manifest.Location(Resources.Location).
+					Include(
+						path.Join(Resources.BaseDir, "serving-net-istio-secret-filtering.patch.tmpl.yaml"),
+					),
 			).
-			Done().
 			WithData(serverless.FeatureData.Serving.Create(&k.Serving).AsAction()).
 			PreConditions(serverless.EnsureServerlessServingDeployed).
 			PostConditions(
@@ -47,12 +48,12 @@ func (k *Kserve) configureServerlessFeatures(dsciSpec *dsciv1.DSCInitializationS
 			)
 
 		servingGateway := feature.Define("serverless-serving-gateways").
-			Manifests().
-			Location(Resources.Location).
-			Paths(
-				path.Join(Resources.GatewaysDir),
+			Manifests(
+				manifest.Location(Resources.Location).
+					Include(
+						path.Join(Resources.GatewaysDir),
+					),
 			).
-			Done().
 			WithData(
 				serverless.FeatureData.IngressDomain.Create(&k.Serving).AsAction(),
 				serverless.FeatureData.Certificate.Create(&k.Serving).AsAction(),
