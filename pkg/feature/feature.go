@@ -140,7 +140,7 @@ func (f *Feature) applyFeature() error {
 
 	for i := range f.resources {
 		r := f.resources[i]
-		if processErr := r.Apply(context.TODO(), f.Client, f.data, MetaOptions(f)...); processErr != nil {
+		if processErr := r.Apply(context.TODO(), f.Client, f.data, DefaultMetaOptions(f)...); processErr != nil {
 			return &withConditionReasonError{reason: featurev1.ConditionReason.ApplyManifests, err: processErr}
 		}
 	}
@@ -168,7 +168,7 @@ func OwnedBy(f *Feature) cluster.MetaOptions {
 	}
 }
 
-func MetaOptions(f *Feature) []cluster.MetaOptions {
+func DefaultMetaOptions(f *Feature) []cluster.MetaOptions {
 	resourceMeta := []cluster.MetaOptions{OwnedBy(f)}
 	if f.Managed {
 		resourceMeta = append(resourceMeta, cluster.WithAnnotations(annotations.ManagedByODHOperator, "true"))
