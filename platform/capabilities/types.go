@@ -31,8 +31,8 @@ type Availability interface {
 }
 
 type PlatformRegistry interface {
-	Save(c context.Context, cli client.Client, metaOptions ...cluster.MetaOptions) error
-	ConfigureCapabilities(context.Context, client.Client, *dsciv1.DSCInitializationSpec, ...cluster.MetaOptions) error
+	Save(ctx context.Context, cli client.Client, metaOptions ...cluster.MetaOptions) error
+	ConfigureCapabilities(ctx context.Context, cli client.Client, dsciSpec *dsciv1.DSCInitializationSpec, metaOptions ...cluster.MetaOptions) error
 	// RemoveCapabilities(context.Context, client.Client, *dsciv1.DSCInitializationSpec) error
 	// authz: apply authorino setup
 	// TODO(after-mvp): when KServe onboarded move authz setup from DSCI controller here

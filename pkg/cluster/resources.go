@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -93,7 +94,7 @@ func CreateOrUpdateConfigMap(ctx context.Context, c client.Client, desiredCfgMap
 	}
 
 	if desiredCfgMap.GetName() == "" || desiredCfgMap.GetNamespace() == "" {
-		return fmt.Errorf("configmap name and namespace must be set")
+		return errors.New("configmap name and namespace must be set")
 	}
 
 	existingCfgMap := &corev1.ConfigMap{}

@@ -1,9 +1,8 @@
-//nolint:ireturn //reason: return T which is expected to be satisfying client.Object interface
 package status
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,7 +31,7 @@ func NewStatusReporter[T client.Object](cli client.Client, object T, determine D
 }
 
 // ReportCondition updates the status of the object using the determineCondition function.
-func (r *Reporter[T]) ReportCondition(optionalErr error) (T, error) {
+func (r *Reporter[T]) ReportCondition(optionalErr error) (T, error) { //nolint:ireturn //reason: returns T satisfying client.Object interface
 	return UpdateWithRetry[T](context.Background(), r.client, r.object, r.determineCondition(optionalErr))
 }
 
@@ -40,10 +39,10 @@ func (r *Reporter[T]) ReportCondition(optionalErr error) (T, error) {
 type SaveStatusFunc[T client.Object] func(saved T)
 
 // UpdateWithRetry updates the status of object using passed function and retries on conflict.
-func UpdateWithRetry[T client.Object](ctx context.Context, cli client.Client, original T, update SaveStatusFunc[T]) (T, error) {
+func UpdateWithRetry[T client.Object](ctx context.Context, cli client.Client, original T, update SaveStatusFunc[T]) (T, error) { //nolint:ireturn,lll //reason: returns T satisfying client.Object interface
 	saved, ok := original.DeepCopyObject().(T)
 	if !ok {
-		return *new(T), fmt.Errorf("failed to deep copy object")
+		return *new(T), errors.New("failed to deep copy object")
 	}
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		if err := cli.Get(ctx, client.ObjectKeyFromObject(original), saved); err != nil {

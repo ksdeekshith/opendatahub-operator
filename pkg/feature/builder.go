@@ -32,7 +32,7 @@ type featureBuilder struct {
 }
 
 // Define creates a new feature builder with the given name.
-func Define(featureName string) *featureBuilder { //nolint:golint,revive //No need to export featureBuilder.
+func Define(featureName string) *featureBuilder {
 	fb := &featureBuilder{
 		featureName: featureName,
 		source: featurev1.Source{
