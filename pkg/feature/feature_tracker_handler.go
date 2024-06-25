@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -35,7 +35,7 @@ func createFeatureTracker(f *Feature) error {
 		return errGet
 	}
 
-	if k8serrors.IsNotFound(errGet) {
+	if k8serr.IsNotFound(errGet) {
 		tracker = featurev1.NewFeatureTracker(f.Name, f.TargetNamespace)
 		tracker.Spec = featurev1.FeatureTrackerSpec{
 			Source:       *f.source,

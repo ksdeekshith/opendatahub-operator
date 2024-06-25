@@ -6,8 +6,8 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dsci "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
-	v1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/infrastructure/v1"
+	dsciv1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
+	infrav1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/infrastructure/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature"
 )
 
@@ -24,26 +24,26 @@ const (
 // FeatureData is a convention to simplify how the data for the Service Mesh features is created and accessed.
 // Being a "singleton" it is based on anonymous struct concept.
 var FeatureData = struct {
-	ControlPlane  feature.ContextDefinition[dsci.DSCInitializationSpec, v1.ControlPlaneSpec]
+	ControlPlane  feature.ContextDefinition[dsciv1.DSCInitializationSpec, infrav1.ControlPlaneSpec]
 	Authorization AuthorizationContext
 }{
-	ControlPlane: feature.ContextDefinition[dsci.DSCInitializationSpec, v1.ControlPlaneSpec]{
-		Create: func(source *dsci.DSCInitializationSpec) feature.ContextEntry[v1.ControlPlaneSpec] {
-			return feature.ContextEntry[v1.ControlPlaneSpec]{
+	ControlPlane: feature.ContextDefinition[dsciv1.DSCInitializationSpec, infrav1.ControlPlaneSpec]{
+		Create: func(source *dsciv1.DSCInitializationSpec) feature.ContextEntry[infrav1.ControlPlaneSpec] {
+			return feature.ContextEntry[infrav1.ControlPlaneSpec]{
 				Key: controlPlaneKey,
-				Value: func(_ context.Context, _ client.Client) (v1.ControlPlaneSpec, error) {
+				Value: func(_ context.Context, _ client.Client) (infrav1.ControlPlaneSpec, error) {
 					return source.ServiceMesh.ControlPlane, nil
 				},
 			}
 		},
-		From: feature.ExtractEntry[v1.ControlPlaneSpec](controlPlaneKey),
+		From: feature.ExtractEntry[infrav1.ControlPlaneSpec](controlPlaneKey),
 	},
 	Authorization: AuthorizationContext{
 		Spec:                  authSpec,
 		Namespace:             authNs,
 		Provider:              authProvider,
 		ExtensionProviderName: authExtensionName,
-		All: func(source *dsci.DSCInitializationSpec) []feature.Action {
+		All: func(source *dsciv1.DSCInitializationSpec) []feature.Action {
 			return []feature.Action{
 				authSpec.Create(source).AsAction(),
 				authNs.Create(source).AsAction(),
@@ -55,27 +55,27 @@ var FeatureData = struct {
 }
 
 type AuthorizationContext struct {
-	Spec                  feature.ContextDefinition[dsci.DSCInitializationSpec, v1.AuthSpec]
-	Namespace             feature.ContextDefinition[dsci.DSCInitializationSpec, string]
-	Provider              feature.ContextDefinition[dsci.DSCInitializationSpec, string]
-	ExtensionProviderName feature.ContextDefinition[dsci.DSCInitializationSpec, string]
-	All                   func(source *dsci.DSCInitializationSpec) []feature.Action
+	Spec                  feature.ContextDefinition[dsciv1.DSCInitializationSpec, infrav1.AuthSpec]
+	Namespace             feature.ContextDefinition[dsciv1.DSCInitializationSpec, string]
+	Provider              feature.ContextDefinition[dsciv1.DSCInitializationSpec, string]
+	ExtensionProviderName feature.ContextDefinition[dsciv1.DSCInitializationSpec, string]
+	All                   func(source *dsciv1.DSCInitializationSpec) []feature.Action
 }
 
-var authSpec = feature.ContextDefinition[dsci.DSCInitializationSpec, v1.AuthSpec]{
-	Create: func(source *dsci.DSCInitializationSpec) feature.ContextEntry[v1.AuthSpec] {
-		return feature.ContextEntry[v1.AuthSpec]{
+var authSpec = feature.ContextDefinition[dsciv1.DSCInitializationSpec, infrav1.AuthSpec]{
+	Create: func(source *dsciv1.DSCInitializationSpec) feature.ContextEntry[infrav1.AuthSpec] {
+		return feature.ContextEntry[infrav1.AuthSpec]{
 			Key: authKey,
-			Value: func(_ context.Context, _ client.Client) (v1.AuthSpec, error) {
+			Value: func(_ context.Context, _ client.Client) (infrav1.AuthSpec, error) {
 				return source.ServiceMesh.Auth, nil
 			},
 		}
 	},
-	From: feature.ExtractEntry[v1.AuthSpec](authKey),
+	From: feature.ExtractEntry[infrav1.AuthSpec](authKey),
 }
 
-var authNs = feature.ContextDefinition[dsci.DSCInitializationSpec, string]{
-	Create: func(source *dsci.DSCInitializationSpec) feature.ContextEntry[string] {
+var authNs = feature.ContextDefinition[dsciv1.DSCInitializationSpec, string]{
+	Create: func(source *dsciv1.DSCInitializationSpec) feature.ContextEntry[string] {
 		return feature.ContextEntry[string]{
 			Key: authProviderNsKey,
 			Value: func(_ context.Context, _ client.Client) (string, error) {
@@ -91,8 +91,8 @@ var authNs = feature.ContextDefinition[dsci.DSCInitializationSpec, string]{
 	From: feature.ExtractEntry[string](authProviderNsKey),
 }
 
-var authProvider = feature.ContextDefinition[dsci.DSCInitializationSpec, string]{
-	Create: func(source *dsci.DSCInitializationSpec) feature.ContextEntry[string] {
+var authProvider = feature.ContextDefinition[dsciv1.DSCInitializationSpec, string]{
+	Create: func(source *dsciv1.DSCInitializationSpec) feature.ContextEntry[string] {
 		return feature.ContextEntry[string]{
 			Key: authProviderNameKey,
 			Value: func(_ context.Context, _ client.Client) (string, error) {
@@ -103,8 +103,8 @@ var authProvider = feature.ContextDefinition[dsci.DSCInitializationSpec, string]
 	From: feature.ExtractEntry[string](authProviderNameKey),
 }
 
-var authExtensionName = feature.ContextDefinition[dsci.DSCInitializationSpec, string]{
-	Create: func(source *dsci.DSCInitializationSpec) feature.ContextEntry[string] {
+var authExtensionName = feature.ContextDefinition[dsciv1.DSCInitializationSpec, string]{
+	Create: func(source *dsciv1.DSCInitializationSpec) feature.ContextEntry[string] {
 		return feature.ContextEntry[string]{
 			Key: authExtensionNameKey,
 			Value: func(_ context.Context, _ client.Client) (string, error) {

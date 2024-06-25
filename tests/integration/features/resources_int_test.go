@@ -4,7 +4,7 @@ import (
 	"context"
 	"path"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dsciv1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
@@ -23,7 +23,7 @@ import (
 var _ = Describe("Applying and updating resources", func() {
 	var (
 		testNamespace   string
-		namespace       *v1.Namespace
+		namespace       *corev1.Namespace
 		objectCleaner   *envtestutil.Cleaner
 		dsci            *dsciv1.DSCInitialization
 		dummyAnnotation string
@@ -138,7 +138,7 @@ var _ = Describe("Applying and updating resources", func() {
 	})
 })
 
-func getServiceAndExpectAnnotations(testClient client.Client, namespace, serviceName string, annotations map[string]string) *v1.Service {
+func getServiceAndExpectAnnotations(testClient client.Client, namespace, serviceName string, annotations map[string]string) *corev1.Service {
 	service, err := fixtures.GetService(testClient, namespace, serviceName)
 	Expect(err).ToNot(HaveOccurred())
 	for key, val := range annotations {
@@ -147,7 +147,7 @@ func getServiceAndExpectAnnotations(testClient client.Client, namespace, service
 	return service
 }
 
-func modifyAndExpectUpdate(client client.Client, service *v1.Service, annotationKey, newValue string) {
+func modifyAndExpectUpdate(client client.Client, service *corev1.Service, annotationKey, newValue string) {
 	if service.Annotations == nil {
 		service.Annotations = make(map[string]string)
 	}

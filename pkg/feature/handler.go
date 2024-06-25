@@ -8,7 +8,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kustomize/api/resmap"
 
-	v1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
+	dsciv1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
 	featurev1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/features/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/controllers/status"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/kustomize"
@@ -104,7 +104,7 @@ func (fh *FeaturesHandler) Delete() error {
 // and add them to the handler's registry.
 type FeaturesProvider func(registry FeaturesRegistry) error
 
-func ClusterFeaturesHandler(dsci *v1.DSCInitialization, def ...FeaturesProvider) *FeaturesHandler {
+func ClusterFeaturesHandler(dsci *dsciv1.DSCInitialization, def ...FeaturesProvider) *FeaturesHandler {
 	return &FeaturesHandler{
 		targetNamespace:   dsci.Spec.ApplicationsNamespace,
 		source:            featurev1.Source{Type: featurev1.DSCIType, Name: dsci.Name},

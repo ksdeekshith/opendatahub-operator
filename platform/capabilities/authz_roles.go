@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	rbacv1 "k8s.io/api/rbac/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
@@ -29,10 +29,10 @@ func CreateOrUpdateAuthzBindings(ctx context.Context, cli client.Client, protect
 
 // DeleteAuthzBindings attempts to remove created authz role/bindings but does not fail if these are not existing in the cluster.
 func DeleteAuthzBindings(ctx context.Context, cli client.Client) error {
-	if err := cluster.DeleteClusterRoleBinding(ctx, cli, roleName); !apierrors.IsNotFound(err) {
+	if err := cluster.DeleteClusterRoleBinding(ctx, cli, roleName); !k8serr.IsNotFound(err) {
 		return err
 	}
-	if err := cluster.DeleteClusterRole(ctx, cli, roleName); !apierrors.IsNotFound(err) {
+	if err := cluster.DeleteClusterRole(ctx, cli, roleName); !k8serr.IsNotFound(err) {
 		return err
 	}
 
