@@ -27,20 +27,26 @@ func (e *withConditionReasonError) Error() string {
 	return e.err.Error()
 }
 
-// createFeatureTracker instantiates FeatureTracker for a given Feature. It's a cluster-scoped resource used
-// to track creation and removal of all owned resources which belong to this Feature.
-// All resources which particular feature is composed of will have this object attached as an OwnerReference.
-func (f *Feature) createFeatureTracker() error {
-	tracker, err := f.getFeatureTracker()
-	if k8serrors.IsNotFound(err) {
-		if err := f.Client.Create(context.TODO(), tracker); err != nil {
-			return err
-		}
-	} else if err != nil {
-		return err
+// createFeatureTracker creates a FeatureTracker, persists it in the cluster,
+// and attaches it to the provided Feature instance.
+func createFeatureTracker(f *Feature) error {
+	tracker, errGet := getFeatureTracker(f)
+	if client.IgnoreNotFound(errGet) != nil {
+		return errGet
 	}
 
-	if gvkErr := f.ensureGVKSet(tracker); gvkErr != nil {
+	if k8serrors.IsNotFound(errGet) {
+		tracker = featurev1.NewFeatureTracker(f.Name, f.TargetNamespace)
+		tracker.Spec = featurev1.FeatureTrackerSpec{
+			Source:       *f.source,
+			AppNamespace: f.TargetNamespace,
+		}
+		if errCreate := f.Client.Create(context.TODO(), tracker); errCreate != nil {
+			return errCreate
+		}
+	}
+
+	if gvkErr := ensureGVKSet(tracker, f.Client.Scheme()); gvkErr != nil {
 		return gvkErr
 	}
 
@@ -50,39 +56,31 @@ func (f *Feature) createFeatureTracker() error {
 }
 
 func removeFeatureTracker(f *Feature) error {
-	if err := getFeatureTrackerIfAbsent(f); err != nil {
-		return client.IgnoreNotFound(err)
+	associatedTracker := f.tracker
+	if associatedTracker == nil {
+		// Check if it is persisted in the cluster, but Feature do not have it attached
+		if tracker, errGet := getFeatureTracker(f); errGet != nil {
+			return errGet
+		} else {
+			associatedTracker = tracker
+		}
 	}
-
-	return deleteTracker(f)
+	return client.IgnoreNotFound(f.Client.Delete(context.Background(), associatedTracker))
 }
 
-func (f *Feature) getFeatureTracker() (*featurev1.FeatureTracker, error) {
+func getFeatureTracker(f *Feature) (*featurev1.FeatureTracker, error) {
 	tracker := featurev1.NewFeatureTracker(f.Name, f.TargetNamespace)
 
-	tracker.Spec = featurev1.FeatureTrackerSpec{
-		Source:       *f.source,
-		AppNamespace: f.TargetNamespace,
+	if errGet := f.Client.Get(context.Background(), client.ObjectKeyFromObject(tracker), tracker); errGet != nil {
+		return nil, errGet
 	}
 
-	err := f.Client.Get(context.Background(), client.ObjectKeyFromObject(tracker), tracker)
-
-	return tracker, err
+	return tracker, nil
 }
 
-func deleteTracker(f *Feature) error {
-	return client.IgnoreNotFound(f.Client.Delete(context.Background(), f.tracker))
-}
-
-func getFeatureTrackerIfAbsent(f *Feature) error {
-	var err error
-	f.tracker, err = f.getFeatureTracker()
-	return err
-}
-
-func (f *Feature) ensureGVKSet(obj runtime.Object) error {
+func ensureGVKSet(obj runtime.Object, scheme *runtime.Scheme) error {
 	// See https://github.com/kubernetes/client-go/issues/308
-	gvks, unversioned, err := f.Client.Scheme().ObjectKinds(obj)
+	gvks, unversioned, err := scheme.ObjectKinds(obj)
 	if err != nil {
 		return fmt.Errorf("failed to get group, version, & kinds for object: %w", err)
 	}
