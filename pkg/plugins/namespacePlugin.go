@@ -1,3 +1,4 @@
+//nolint:ireturn //reason: false positive, builtins.NamespaceTransformerPlugin is a struct
 package plugins
 
 import (

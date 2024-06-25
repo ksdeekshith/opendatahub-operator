@@ -1,3 +1,4 @@
+//nolint:ireturn //reason: returning generic T data type
 package feature
 
 import (
@@ -20,7 +21,7 @@ type ContextEntry[T any] struct {
 	Value provider.DataProviderFunc[T]
 }
 
-// ContextDefinition defines how the data is created and fetched from the Feature's data.
+// ContextDefinition defines how the data is created and fetched from the Feature's context.
 type ContextDefinition[S, T any] struct {
 	// Create is a factory function to create a Feature's ContextEntry from the given source.
 	Create func(source *S) ContextEntry[T]
@@ -28,7 +29,7 @@ type ContextDefinition[S, T any] struct {
 	From func(f *Feature) (T, error)
 }
 
-// ExtractEntry is a template for defining a function to extract a value from the Feature's data using defined key.
+// ExtractEntry is a template for defining a function to extract a value from the Feature's context using defined key.
 func ExtractEntry[T any](key string) func(f *Feature) (T, error) {
 	return func(f *Feature) (T, error) {
 		return Get[T](f, key)
@@ -52,8 +53,8 @@ func addToContextFromProvider[T any](key string, provider provider.DataProviderF
 	}
 }
 
-// Get allows to retrieve arbitrary value from the Feature's data.
-func Get[T any](f *Feature, key string) (T, error) { //nolint:ireturn //Reason generic type
+// Get allows to retrieve arbitrary value from the Feature's context.
+func Get[T any](f *Feature, key string) (T, error) {
 	var data T
 	var ok bool
 
@@ -70,7 +71,7 @@ func Get[T any](f *Feature, key string) (T, error) { //nolint:ireturn //Reason g
 	return data, nil
 }
 
-// Set allows to store a value under given key in the Feature's data.
+// Set allows to store a value under given key in the Feature's context.
 func (f *Feature) Set(key string, data any) error {
 	if f.data == nil {
 		f.data = map[string]any{}

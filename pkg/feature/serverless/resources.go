@@ -10,7 +10,7 @@ import (
 )
 
 func ServingCertificateResource(f *feature.Feature) error {
-	secretData, err := fetchSecretParams(f)
+	secretData, err := getSecretParams(f)
 	if err != nil {
 		return err
 	}
@@ -37,7 +37,7 @@ type secretParams struct {
 	Type      infrav1.CertType
 }
 
-func fetchSecretParams(f *feature.Feature) (*secretParams, error) {
+func getSecretParams(f *feature.Feature) (*secretParams, error) {
 	result := &secretParams{}
 
 	if secret, err := FeatureData.Certificate.From(f); err == nil {
