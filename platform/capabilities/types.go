@@ -89,7 +89,7 @@ func (r *Registry) ConfigureCapabilities(ctx context.Context, cli client.Client,
 	// TODO(mvp): we need to track state if we once were deployed, but now not needed?
 	if isRequired(handlers...) {
 		// return nil // nothing to do..
-		err = authInitializer.Apply()
+		err = authInitializer.Apply(ctx)
 		if err != nil {
 			return err
 		}
@@ -100,7 +100,7 @@ func (r *Registry) ConfigureCapabilities(ctx context.Context, cli client.Client,
 			return err
 		}
 	} else {
-		if err := authInitializer.Delete(); err != nil {
+		if err := authInitializer.Delete(ctx); err != nil {
 			return err
 		}
 

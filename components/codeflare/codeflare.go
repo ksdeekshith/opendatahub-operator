@@ -36,11 +36,11 @@ type CodeFlare struct {
 	components.Component `json:""`
 }
 
-func (c *CodeFlare) OverrideManifests(_ string) error {
+func (c *CodeFlare) OverrideManifests(ctx context.Context, _ string) error {
 	// If devflags are set, update default manifests path
 	if len(c.DevFlags.Manifests) != 0 {
 		manifestConfig := c.DevFlags.Manifests[0]
-		if err := deploy.DownloadManifests(ComponentName, manifestConfig); err != nil {
+		if err := deploy.DownloadManifests(ctx, ComponentName, manifestConfig); err != nil {
 			return err
 		}
 		// If overlay is defined, update paths
@@ -75,7 +75,7 @@ func (c *CodeFlare) ReconcileComponent(
 	if enabled {
 		if c.DevFlags != nil {
 			// Download manifests and update paths
-			if err := c.OverrideManifests(string(platform)); err != nil {
+			if err := c.OverrideManifests(ctx, string(platform)); err != nil {
 				return err
 			}
 		}
@@ -83,7 +83,7 @@ func (c *CodeFlare) ReconcileComponent(
 		// Both ODH and RHOAI should have the same operator name
 		dependentOperator := CodeflareOperator
 
-		if found, err := cluster.OperatorExists(cli, dependentOperator); err != nil {
+		if found, err := cluster.OperatorExists(ctx, cli, dependentOperator); err != nil {
 			return fmt.Errorf("operator exists throws error %w", err)
 		} else if found {
 			return fmt.Errorf("operator %s is found. Please uninstall the operator before enabling %s component",
@@ -99,7 +99,7 @@ func (c *CodeFlare) ReconcileComponent(
 	}
 
 	// Deploy Codeflare
-	if err := deploy.DeployManifestsFromPath(cli, owner, //nolint:revive,nolintlint
+	if err := deploy.DeployManifestsFromPath(ctx, cli, owner, //nolint:revive,nolintlint
 		CodeflarePath,
 		dscispec.ApplicationsNamespace,
 		ComponentName, enabled); err != nil {
@@ -120,7 +120,7 @@ func (c *CodeFlare) ReconcileComponent(
 		if err := c.UpdatePrometheusConfig(cli, enabled && monitoringEnabled, ComponentName); err != nil {
 			return err
 		}
-		if err := deploy.DeployManifestsFromPath(cli, owner,
+		if err := deploy.DeployManifestsFromPath(ctx, cli, owner,
 			filepath.Join(deploy.DefaultManifestPath, "monitoring", "prometheus", "apps"),
 			dscispec.Monitoring.Namespace,
 			"prometheus", true); err != nil {

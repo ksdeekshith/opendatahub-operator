@@ -181,7 +181,7 @@ func configureAlertManager(ctx context.Context, dsciInit *dsciv1.DSCInitializati
 		return err
 	}
 	// r.Log.Info("Success: update alertmanage-configs.yaml with email")
-	err = deploy.DeployManifestsFromPath(r.Client, dsciInit, alertManagerPath, dsciInit.Spec.Monitoring.Namespace, "alertmanager", true)
+	err = deploy.DeployManifestsFromPath(ctx, r.Client, dsciInit, alertManagerPath, dsciInit.Spec.Monitoring.Namespace, "alertmanager", true)
 	if err != nil {
 		r.Log.Error(err, "error to deploy manifests", "path", alertManagerPath)
 		return err
@@ -225,6 +225,7 @@ func configurePrometheus(ctx context.Context, dsciInit *dsciv1.DSCInitialization
 
 	// Deploy prometheus manifests from prometheus/apps
 	if err = deploy.DeployManifestsFromPath(
+		ctx,
 		r.Client,
 		dsciInit,
 		prometheusConfigPath,
@@ -328,7 +329,7 @@ func configurePrometheus(ctx context.Context, dsciInit *dsciv1.DSCInitialization
 		}
 	}
 
-	err = deploy.DeployManifestsFromPath(r.Client, dsciInit, prometheusManifestsPath,
+	err = deploy.DeployManifestsFromPath(ctx, r.Client, dsciInit, prometheusManifestsPath,
 		dsciInit.Spec.Monitoring.Namespace, "prometheus", true)
 	if err != nil {
 		r.Log.Error(err, "error to deploy manifests for prometheus", "path", prometheusManifestsPath)
@@ -373,7 +374,7 @@ func configureBlackboxExporter(ctx context.Context, dsciInit *dsciv1.DSCInitiali
 
 	blackBoxPath := filepath.Join(deploy.DefaultManifestPath, "monitoring", "blackbox-exporter")
 	if k8serr.IsNotFound(err) || strings.Contains(consoleRoute.Spec.Host, "redhat.com") {
-		if err := deploy.DeployManifestsFromPath(r.Client,
+		if err := deploy.DeployManifestsFromPath(ctx, r.Client,
 			dsciInit,
 			filepath.Join(blackBoxPath, "internal"),
 			dsciInit.Spec.Monitoring.Namespace,
@@ -383,7 +384,7 @@ func configureBlackboxExporter(ctx context.Context, dsciInit *dsciv1.DSCInitiali
 			return err
 		}
 	} else {
-		if err := deploy.DeployManifestsFromPath(r.Client,
+		if err := deploy.DeployManifestsFromPath(ctx, r.Client,
 			dsciInit,
 			filepath.Join(blackBoxPath, "external"),
 			dsciInit.Spec.Monitoring.Namespace,
@@ -432,19 +433,39 @@ func createMonitoringProxySecret(ctx context.Context, cli client.Client, name st
 	return nil
 }
 
-func (r *DSCInitializationReconciler) configureCommonMonitoring(dsciInit *dsciv1.DSCInitialization) error {
-	// configure segment.io
-	segmentPath := filepath.Join(deploy.DefaultManifestPath, "monitoring", "segment")
-	if err := deploy.DeployManifestsFromPath(
-		r.Client,
-		dsciInit,
-		segmentPath,
-		dsciInit.Spec.ApplicationsNamespace,
-		"segment-io",
-		dsciInit.Spec.Monitoring.ManagementState == operatorv1.Managed); err != nil {
-		r.Log.Error(err, "error to deploy manifests under "+segmentPath)
+func (r *DSCInitializationReconciler) configureSegmentIO(ctx context.Context, dsciInit *dsciv1.DSCInitialization) error {
+	// create segment.io only when configmap does not exist in the cluster
+	segmentioConfigMap := &corev1.ConfigMap{}
+	if err := r.Client.Get(ctx, client.ObjectKey{
+		Namespace: dsciInit.Spec.ApplicationsNamespace,
+		Name:      "odh-segment-key-config",
+	}, segmentioConfigMap); err != nil {
+		if !k8serr.IsNotFound(err) {
+			r.Log.Error(err, "error to get configmap 'odh-segment-key-config'")
+			return err
+		} else {
+			segmentPath := filepath.Join(deploy.DefaultManifestPath, "monitoring", "segment")
+			if err := deploy.DeployManifestsFromPath(
+				ctx,
+				r.Client,
+				dsciInit,
+				segmentPath,
+				dsciInit.Spec.ApplicationsNamespace,
+				"segment-io",
+				dsciInit.Spec.Monitoring.ManagementState == operatorv1.Managed); err != nil {
+				r.Log.Error(err, "error to deploy manifests under "+segmentPath)
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (r *DSCInitializationReconciler) configureCommonMonitoring(ctx context.Context, dsciInit *dsciv1.DSCInitialization) error {
+	if err := r.configureSegmentIO(ctx, dsciInit); err != nil {
 		return err
 	}
+
 	// configure monitoring base
 	monitoringBasePath := filepath.Join(deploy.DefaultManifestPath, "monitoring", "base")
 	err := common.ReplaceStringsInFile(filepath.Join(monitoringBasePath, "rhods-servicemonitor.yaml"),
@@ -458,6 +479,7 @@ func (r *DSCInitializationReconciler) configureCommonMonitoring(dsciInit *dsciv1
 	}
 	// do not set monitoring namespace here, it is hardcoded by manifests
 	if err := deploy.DeployManifestsFromPath(
+		ctx,
 		r.Client,
 		dsciInit,
 		monitoringBasePath,

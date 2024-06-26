@@ -1,6 +1,7 @@
 package dscinitialization
 
 import (
+	"context"
 	"fmt"
 	"path"
 
@@ -16,7 +17,7 @@ import (
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/servicemesh"
 )
 
-func (r *DSCInitializationReconciler) configureServiceMesh(instance *dsciv1.DSCInitialization) error {
+func (r *DSCInitializationReconciler) configureServiceMesh(ctx context.Context, instance *dsciv1.DSCInitialization) error {
 	serviceMeshManagementState := operatorv1.Removed
 	if instance.Spec.ServiceMesh != nil {
 		serviceMeshManagementState = instance.Spec.ServiceMesh.ManagementState
@@ -31,14 +32,14 @@ func (r *DSCInitializationReconciler) configureServiceMesh(instance *dsciv1.DSCI
 			r.serviceMeshCapability(instance, serviceMeshCondition(status.ConfiguredReason, "Service Mesh configured")),
 		}
 
-		authzCapability, err := r.authorizationCapability(instance, authorizationCondition(status.ConfiguredReason, "Service Mesh Authorization configured"))
+		authzCapability, err := r.authorizationCapability(ctx, instance, authorizationCondition(status.ConfiguredReason, "Service Mesh Authorization configured"))
 		if err != nil {
 			return err
 		}
 		capabilities = append(capabilities, authzCapability)
 
 		for _, capability := range capabilities {
-			capabilityErr := capability.Apply()
+			capabilityErr := capability.Apply(ctx)
 			if capabilityErr != nil {
 				r.Log.Error(capabilityErr, "failed applying service mesh resources")
 				r.Recorder.Eventf(instance, corev1.EventTypeWarning, "DSCInitializationReconcileError", "failed applying service mesh resources")
@@ -50,14 +51,15 @@ func (r *DSCInitializationReconciler) configureServiceMesh(instance *dsciv1.DSCI
 		r.Log.Info("ServiceMesh CR is not configured by the operator, we won't do anything")
 	case operatorv1.Removed:
 		r.Log.Info("existing ServiceMesh CR (owned by operator) will be removed")
-		if err := r.removeServiceMesh(instance); err != nil {
+		if err := r.removeServiceMesh(ctx, instance); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
-func (r *DSCInitializationReconciler) removeServiceMesh(instance *dsciv1.DSCInitialization) error {
+func (r *DSCInitializationReconciler) removeServiceMesh(ctx context.Context, instance *dsciv1.DSCInitialization) error {
 	// on condition of Managed, do not handle Removed when set to Removed it trigger DSCI reconcile to clean up
 	if instance.Spec.ServiceMesh == nil {
 		return nil
@@ -67,7 +69,7 @@ func (r *DSCInitializationReconciler) removeServiceMesh(instance *dsciv1.DSCInit
 			r.serviceMeshCapability(instance, serviceMeshCondition(status.RemovedReason, "Service Mesh removed")),
 		}
 
-		authzCapability, err := r.authorizationCapability(instance, authorizationCondition(status.RemovedReason, "Service Mesh Authorization removed"))
+		authzCapability, err := r.authorizationCapability(ctx, instance, authorizationCondition(status.RemovedReason, "Service Mesh Authorization removed"))
 		if err != nil {
 			return err
 		}
@@ -75,7 +77,7 @@ func (r *DSCInitializationReconciler) removeServiceMesh(instance *dsciv1.DSCInit
 		capabilities = append(capabilities, authzCapability)
 
 		for _, capability := range capabilities {
-			capabilityErr := capability.Delete()
+			capabilityErr := capability.Delete(ctx)
 			if capabilityErr != nil {
 				r.Log.Error(capabilityErr, "failed deleting service mesh resources")
 				r.Recorder.Eventf(instance, corev1.EventTypeWarning, "DSCInitializationReconcileError", "failed deleting service mesh resources")
@@ -94,8 +96,8 @@ func (r *DSCInitializationReconciler) serviceMeshCapability(dsci *dsciv1.DSCInit
 	)
 }
 
-func (r *DSCInitializationReconciler) authorizationCapability(instance *dsciv1.DSCInitialization, condition *conditionsv1.Condition) (*feature.HandlerWithReporter[*dsciv1.DSCInitialization], error) { //nolint:lll // Reason: generics are long
-	authorinoInstalled, err := cluster.SubscriptionExists(r.Client, "authorino-operator")
+func (r *DSCInitializationReconciler) authorizationCapability(ctx context.Context, instance *dsciv1.DSCInitialization, condition *conditionsv1.Condition) (*feature.HandlerWithReporter[*dsciv1.DSCInitialization], error) { //nolint:lll // Reason: generics are long
+	authorinoInstalled, err := cluster.SubscriptionExists(ctx, r.Client, "authorino-operator")
 	if err != nil {
 		return nil, fmt.Errorf("failed to list subscriptions %w", err)
 	}
@@ -214,8 +216,8 @@ func (r *DSCInitializationReconciler) authorizationFeatures(dsci *dsciv1.DSCInit
 			feature.Define("enable-proxy-injection-in-authorino-deployment").
 				PreConditions(
 					servicemesh.EnsureAuthNamespaceExists,
-					func(f *feature.Feature) error {
-						return feature.WaitForPodsToBeReady(serviceMeshSpec.Auth.Namespace)(f)
+					func(ctx context.Context, f *feature.Feature) error {
+						return feature.WaitForPodsToBeReady(serviceMeshSpec.Auth.Namespace)(ctx, f)
 					}).
 				Manifests(
 					manifest.Location(Templates.Location).

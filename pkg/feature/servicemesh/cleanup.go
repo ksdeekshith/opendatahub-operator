@@ -11,7 +11,7 @@ import (
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature"
 )
 
-func RemoveExtensionProvider(f *feature.Feature) error {
+func RemoveExtensionProvider(ctx context.Context, f *feature.Feature) error {
 	extensionName, extensionNameErr := FeatureData.Authorization.ExtensionProviderName.From(f)
 	if extensionNameErr != nil {
 		return fmt.Errorf("failed to get extension name struct: %w", extensionNameErr)
@@ -25,7 +25,7 @@ func RemoveExtensionProvider(f *feature.Feature) error {
 	smcp := &unstructured.Unstructured{}
 	smcp.SetGroupVersionKind(gvk.ServiceMeshControlPlane)
 
-	if err := f.Client.Get(context.TODO(), client.ObjectKey{
+	if err := f.Client.Get(ctx, client.ObjectKey{
 		Namespace: controlPlane.Namespace,
 		Name:      controlPlane.Name,
 	}, smcp); err != nil {
@@ -62,5 +62,5 @@ func RemoveExtensionProvider(f *feature.Feature) error {
 		}
 	}
 
-	return f.Client.Update(context.TODO(), smcp)
+	return f.Client.Update(ctx, smcp)
 }

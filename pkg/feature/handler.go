@@ -2,6 +2,7 @@
 package feature
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
@@ -16,8 +17,8 @@ import (
 )
 
 type featuresHandler interface {
-	Apply() error
-	Delete() error
+	Apply(ctx context.Context) error
+	Delete(ctx context.Context) error
 }
 
 type FeaturesRegistry interface {
@@ -60,7 +61,7 @@ func (fh *FeaturesHandler) Add(builders ...*featureBuilder) error {
 	return featureAddErrors.ErrorOrNil()
 }
 
-func (fh *FeaturesHandler) Apply() error {
+func (fh *FeaturesHandler) Apply(ctx context.Context) error {
 	fh.features = make([]*Feature, 0)
 
 	for _, featuresProvider := range fh.featuresProviders {
@@ -71,7 +72,7 @@ func (fh *FeaturesHandler) Apply() error {
 
 	var applyErrors *multierror.Error
 	for _, f := range fh.features {
-		if applyErr := f.Apply(); applyErr != nil {
+		if applyErr := f.Apply(ctx); applyErr != nil {
 			applyErrors = multierror.Append(applyErrors, fmt.Errorf("failed applying FeatureHandler features. cause: %w", applyErr))
 		}
 	}
@@ -81,7 +82,7 @@ func (fh *FeaturesHandler) Apply() error {
 
 // Delete executes registered clean-up tasks for handled Features in the opposite order they were initiated.
 // This approach assumes that Features are either instantiated in the correct sequence or are self-contained.
-func (fh *FeaturesHandler) Delete() error {
+func (fh *FeaturesHandler) Delete(ctx context.Context) error {
 	fh.features = make([]*Feature, 0)
 
 	for _, featuresProvider := range fh.featuresProviders {
@@ -92,7 +93,7 @@ func (fh *FeaturesHandler) Delete() error {
 
 	var cleanupErrors *multierror.Error
 	for i := len(fh.features) - 1; i >= 0; i-- {
-		if cleanupErr := fh.features[i].Cleanup(); cleanupErr != nil {
+		if cleanupErr := fh.features[i].Cleanup(ctx); cleanupErr != nil {
 			cleanupErrors = multierror.Append(cleanupErrors, fmt.Errorf("failed executing cleanup in FeatureHandler. cause: %w", cleanupErr))
 		}
 	}
@@ -142,17 +143,17 @@ func NewHandlerWithReporter[T client.Object](handler *FeaturesHandler, reporter 
 	}
 }
 
-func (h HandlerWithReporter[T]) Apply() error {
-	applyErr := h.handler.Apply()
-	_, reportErr := h.reporter.ReportCondition(applyErr)
+func (h HandlerWithReporter[T]) Apply(ctx context.Context) error {
+	applyErr := h.handler.Apply(ctx)
+	_, reportErr := h.reporter.ReportCondition(ctx, applyErr)
 	// We could have failed during Apply phase as well as during reporting.
 	// We should return both errors to the caller.
 	return multierror.Append(applyErr, reportErr).ErrorOrNil()
 }
 
-func (h HandlerWithReporter[T]) Delete() error {
-	deleteErr := h.handler.Delete()
-	_, reportErr := h.reporter.ReportCondition(deleteErr)
+func (h HandlerWithReporter[T]) Delete(ctx context.Context) error {
+	deleteErr := h.handler.Delete(ctx)
+	_, reportErr := h.reporter.ReportCondition(ctx, deleteErr)
 	// We could have failed during Delete phase as well as during reporting.
 	// We should return both errors to the caller.
 	return multierror.Append(deleteErr, reportErr).ErrorOrNil()

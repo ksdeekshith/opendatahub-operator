@@ -42,8 +42,7 @@ func (c ContextEntry[T]) AsAction() Action {
 }
 
 func addToContextFromProvider[T any](key string, provider provider.DataProviderFunc[T]) Action {
-	return func(f *Feature) error {
-		ctx := context.TODO()
+	return func(ctx context.Context, f *Feature) error {
 		data, err := provider(ctx, f.Client)
 		if err != nil {
 			return err

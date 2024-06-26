@@ -14,7 +14,7 @@ import (
 
 // MeshRefs stores service mesh configuration in the config map, so it can
 // be easily accessed by other components which rely on this information.
-func MeshRefs(f *feature.Feature) error {
+func MeshRefs(ctx context.Context, f *feature.Feature) error {
 	meshConfig, err := FeatureData.ControlPlane.From(f)
 	if err != nil {
 		return fmt.Errorf("failed to get control plane struct: %w", err)
@@ -27,7 +27,7 @@ func MeshRefs(f *feature.Feature) error {
 	}
 
 	return cluster.CreateOrUpdateConfigMap(
-		context.TODO(),
+		ctx,
 		f.Client,
 		&corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -42,7 +42,7 @@ func MeshRefs(f *feature.Feature) error {
 
 // AuthRefs stores authorization configuration in the config map, so it can
 // be easily accessed by other components which rely on this information.
-func AuthRefs(f *feature.Feature) error {
+func AuthRefs(ctx context.Context, f *feature.Feature) error {
 	targetNamespace := f.TargetNamespace
 	auth, err := FeatureData.Authorization.Spec.From(f)
 	if err != nil {
@@ -72,7 +72,7 @@ func AuthRefs(f *feature.Feature) error {
 	}
 
 	return cluster.CreateOrUpdateConfigMap(
-		context.TODO(),
+		ctx,
 		f.Client,
 		&corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{

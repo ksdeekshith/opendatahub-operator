@@ -1,6 +1,7 @@
 package kserve
 
 import (
+	"context"
 	"fmt"
 	"path"
 
@@ -14,28 +15,28 @@ import (
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/servicemesh"
 )
 
-func (k *Kserve) configureServiceMesh(cli client.Client, dscispec *dsciv1.DSCInitializationSpec) error {
+func (k *Kserve) configureServiceMesh(ctx context.Context, cli client.Client, dscispec *dsciv1.DSCInitializationSpec) error {
 	if dscispec.ServiceMesh != nil {
 		if dscispec.ServiceMesh.ManagementState == operatorv1.Managed && k.GetManagementState() == operatorv1.Managed {
-			serviceMeshInitializer := feature.ComponentFeaturesHandler(k.GetComponentName(), dscispec.ApplicationsNamespace, k.defineServiceMeshFeatures(cli, dscispec))
-			return serviceMeshInitializer.Apply()
+			serviceMeshInitializer := feature.ComponentFeaturesHandler(k.GetComponentName(), dscispec.ApplicationsNamespace, k.defineServiceMeshFeatures(ctx, cli, dscispec))
+			return serviceMeshInitializer.Apply(ctx)
 		}
 		if dscispec.ServiceMesh.ManagementState == operatorv1.Unmanaged && k.GetManagementState() == operatorv1.Managed {
 			return nil
 		}
 	}
 
-	return k.removeServiceMeshConfigurations(cli, dscispec)
+	return k.removeServiceMeshConfigurations(ctx, cli, dscispec)
 }
 
-func (k *Kserve) removeServiceMeshConfigurations(cli client.Client, dscispec *dsciv1.DSCInitializationSpec) error {
-	serviceMeshInitializer := feature.ComponentFeaturesHandler(k.GetComponentName(), dscispec.ApplicationsNamespace, k.defineServiceMeshFeatures(cli, dscispec))
-	return serviceMeshInitializer.Delete()
+func (k *Kserve) removeServiceMeshConfigurations(ctx context.Context, cli client.Client, dscispec *dsciv1.DSCInitializationSpec) error {
+	serviceMeshInitializer := feature.ComponentFeaturesHandler(k.GetComponentName(), dscispec.ApplicationsNamespace, k.defineServiceMeshFeatures(ctx, cli, dscispec))
+	return serviceMeshInitializer.Delete(ctx)
 }
 
-func (k *Kserve) defineServiceMeshFeatures(cli client.Client, dscispec *dsciv1.DSCInitializationSpec) feature.FeaturesProvider {
+func (k *Kserve) defineServiceMeshFeatures(ctx context.Context, cli client.Client, dscispec *dsciv1.DSCInitializationSpec) feature.FeaturesProvider {
 	return func(registry feature.FeaturesRegistry) error {
-		authorinoInstalled, err := cluster.SubscriptionExists(cli, "authorino-operator")
+		authorinoInstalled, err := cluster.SubscriptionExists(ctx, cli, "authorino-operator")
 		if err != nil {
 			return fmt.Errorf("failed to list subscriptions %w", err)
 		}

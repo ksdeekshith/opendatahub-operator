@@ -58,35 +58,35 @@ type Feature struct {
 	dataProviders     []Action
 }
 
-// Action is a func type which can be used for different purposes while having access to the owning Feature struct.
-type Action func(f *Feature) error
+// Action is a func type which can be used for different purposes while having access to Feature struct.
+type Action func(ctx context.Context, feature *Feature) error
 
 // Apply applies the feature to the cluster.
 // It creates a FeatureTracker resource to establish ownership and reports the result of the operation as a condition.
-func (f *Feature) Apply() error {
+func (f *Feature) Apply(ctx context.Context) error {
 	if !f.Enabled {
 		return nil
 	}
 
-	if trackerErr := createFeatureTracker(f); trackerErr != nil {
+	if trackerErr := createFeatureTracker(ctx, f); trackerErr != nil {
 		return trackerErr
 	}
 
-	if _, updateErr := status.UpdateWithRetry(context.Background(), f.Client, f.tracker, func(saved *featurev1.FeatureTracker) {
+	if _, updateErr := status.UpdateWithRetry(ctx, f.Client, f.tracker, func(saved *featurev1.FeatureTracker) {
 		status.SetProgressingCondition(&saved.Status.Conditions, string(featurev1.ConditionReason.FeatureCreated), fmt.Sprintf("Applying feature [%s]", f.Name))
 		saved.Status.Phase = status.PhaseProgressing
 	}); updateErr != nil {
 		return updateErr
 	}
 
-	applyErr := f.applyFeature()
-	_, reportErr := createFeatureTrackerStatusReporter(f).ReportCondition(applyErr)
+	applyErr := f.applyFeature(ctx)
+	_, reportErr := createFeatureTrackerStatusReporter(f).ReportCondition(ctx, applyErr)
 
 	return multierror.Append(applyErr, reportErr).ErrorOrNil()
 }
 
 // Cleanup removes all resources associated with the feature and invokes any cleanup functions defined as part of the Feature.
-func (f *Feature) Cleanup() error {
+func (f *Feature) Cleanup(ctx context.Context) error {
 	if !f.Enabled {
 		return nil
 	}
@@ -97,7 +97,7 @@ func (f *Feature) Cleanup() error {
 
 	var cleanupErrors *multierror.Error
 	for _, dataProvider := range f.dataProviders {
-		cleanupErrors = multierror.Append(cleanupErrors, dataProvider(f))
+		cleanupErrors = multierror.Append(cleanupErrors, dataProvider(ctx, f))
 	}
 
 	if dataLoadErr := cleanupErrors.ErrorOrNil(); dataLoadErr != nil {
@@ -105,7 +105,7 @@ func (f *Feature) Cleanup() error {
 	}
 
 	for _, cleanupFunc := range f.cleanups {
-		cleanupErrors = multierror.Append(cleanupErrors, cleanupFunc(f))
+		cleanupErrors = multierror.Append(cleanupErrors, cleanupFunc(ctx, f))
 	}
 
 	return cleanupErrors.ErrorOrNil()
@@ -115,38 +115,38 @@ func (f *Feature) addCleanup(cleanupFuncs ...Action) {
 	f.cleanups = append(f.cleanups, cleanupFuncs...)
 }
 
-func (f *Feature) applyFeature() error {
+func (f *Feature) applyFeature(ctx context.Context) error {
 	var multiErr *multierror.Error
 
 	for _, dataProvider := range f.dataProviders {
-		multiErr = multierror.Append(multiErr, dataProvider(f))
+		multiErr = multierror.Append(multiErr, dataProvider(ctx, f))
 	}
 	if errDataLoader := multiErr.ErrorOrNil(); errDataLoader != nil {
 		return &withConditionReasonError{reason: featurev1.ConditionReason.LoadTemplateData, err: errDataLoader}
 	}
 
 	for _, precondition := range f.preconditions {
-		multiErr = multierror.Append(multiErr, precondition(f))
+		multiErr = multierror.Append(multiErr, precondition(ctx, f))
 	}
 	if preconditionsErr := multiErr.ErrorOrNil(); preconditionsErr != nil {
 		return &withConditionReasonError{reason: featurev1.ConditionReason.PreConditions, err: preconditionsErr}
 	}
 
 	for _, clusterOperation := range f.clusterOperations {
-		if errClusterOperation := clusterOperation(f); errClusterOperation != nil {
+		if errClusterOperation := clusterOperation(ctx, f); errClusterOperation != nil {
 			return &withConditionReasonError{reason: featurev1.ConditionReason.ResourceCreation, err: errClusterOperation}
 		}
 	}
 
 	for i := range f.resources {
 		r := f.resources[i]
-		if processErr := r.Apply(context.TODO(), f.Client, f.data, DefaultMetaOptions(f)...); processErr != nil {
+		if processErr := r.Apply(ctx, f.Client, f.data, DefaultMetaOptions(f)...); processErr != nil {
 			return &withConditionReasonError{reason: featurev1.ConditionReason.ApplyManifests, err: processErr}
 		}
 	}
 
 	for _, postcondition := range f.postconditions {
-		multiErr = multierror.Append(multiErr, postcondition(f))
+		multiErr = multierror.Append(multiErr, postcondition(ctx, f))
 	}
 	if postConditionErr := multiErr.ErrorOrNil(); postConditionErr != nil {
 		return &withConditionReasonError{reason: featurev1.ConditionReason.PostConditions, err: postConditionErr}

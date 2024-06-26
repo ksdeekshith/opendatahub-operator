@@ -1,6 +1,7 @@
 package features_test
 
 import (
+	"context"
 	"errors"
 
 	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
@@ -31,7 +32,7 @@ var _ = Describe("Feature tracking capability", func() {
 
 	Context("Reporting progress when applying Feature", func() {
 
-		It("should indicate successful installation in FeatureTracker through Status conditions", func() {
+		It("should indicate successful installation in FeatureTracker through Status conditions", func(ctx context.Context) {
 			featuresHandler := feature.ClusterFeaturesHandler(dsci, func(registry feature.FeaturesRegistry) error {
 				verificationFeatureErr := registry.Add(
 					feature.Define("always-working-feature").
@@ -44,10 +45,10 @@ var _ = Describe("Feature tracking capability", func() {
 			})
 
 			// when
-			Expect(featuresHandler.Apply()).To(Succeed())
+			Expect(featuresHandler.Apply(ctx)).To(Succeed())
 
 			// then
-			featureTracker, err := fixtures.GetFeatureTracker(envTestClient, appNamespace, "always-working-feature")
+			featureTracker, err := fixtures.GetFeatureTracker(ctx, envTestClient, appNamespace, "always-working-feature")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(featureTracker.Status.Phase).To(Equal(status.PhaseReady))
 			Expect(featureTracker.Status.Conditions).To(ContainElement(
@@ -59,12 +60,12 @@ var _ = Describe("Feature tracking capability", func() {
 			))
 		})
 
-		It("should indicate when failure occurs in preconditions through Status conditions", func() {
+		It("should indicate when failure occurs in preconditions through Status conditions", func(ctx context.Context) {
 			// given
 			featuresHandler := feature.ClusterFeaturesHandler(dsci, func(registry feature.FeaturesRegistry) error {
 				verificationFeatureErr := registry.Add(feature.Define("precondition-fail").
 					UsingConfig(envTest.Config).
-					PreConditions(func(_ *feature.Feature) error {
+					PreConditions(func(_ context.Context, _ *feature.Feature) error {
 						return errors.New("during test always fail")
 					}),
 				)
@@ -75,10 +76,10 @@ var _ = Describe("Feature tracking capability", func() {
 			})
 
 			// when
-			Expect(featuresHandler.Apply()).ToNot(Succeed())
+			Expect(featuresHandler.Apply(ctx)).ToNot(Succeed())
 
 			// then
-			featureTracker, err := fixtures.GetFeatureTracker(envTestClient, appNamespace, "precondition-fail")
+			featureTracker, err := fixtures.GetFeatureTracker(ctx, envTestClient, appNamespace, "precondition-fail")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(featureTracker.Status.Phase).To(Equal(status.PhaseError))
 			Expect(featureTracker.Status.Conditions).To(ContainElement(
@@ -90,12 +91,12 @@ var _ = Describe("Feature tracking capability", func() {
 			))
 		})
 
-		It("should indicate when failure occurs in post-conditions through Status conditions", func() {
+		It("should indicate when failure occurs in post-conditions through Status conditions", func(ctx context.Context) {
 			// given
 			featuresHandler := feature.ClusterFeaturesHandler(dsci, func(registry feature.FeaturesRegistry) error {
 				verificationFeatureErr := registry.Add(feature.Define("post-condition-failure").
 					UsingConfig(envTest.Config).
-					PostConditions(func(_ *feature.Feature) error {
+					PostConditions(func(_ context.Context, _ *feature.Feature) error {
 						return errors.New("during test always fail")
 					}),
 				)
@@ -106,10 +107,10 @@ var _ = Describe("Feature tracking capability", func() {
 			})
 
 			// when
-			Expect(featuresHandler.Apply()).ToNot(Succeed())
+			Expect(featuresHandler.Apply(ctx)).ToNot(Succeed())
 
 			// then
-			featureTracker, err := fixtures.GetFeatureTracker(envTestClient, appNamespace, "post-condition-failure")
+			featureTracker, err := fixtures.GetFeatureTracker(ctx, envTestClient, appNamespace, "post-condition-failure")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(featureTracker.Status.Phase).To(Equal(status.PhaseError))
 			Expect(featureTracker.Status.Conditions).To(ContainElement(
@@ -124,7 +125,7 @@ var _ = Describe("Feature tracking capability", func() {
 
 	Context("adding metadata of FeatureTracker origin", func() {
 
-		It("should correctly indicate source in the feature tracker", func() {
+		It("should correctly indicate source in the feature tracker", func(ctx context.Context) {
 			// given
 			featuresHandler := feature.ClusterFeaturesHandler(dsci, func(registry feature.FeaturesRegistry) error {
 				emptyFeatureErr := registry.Add(feature.Define("always-working-feature").
@@ -137,10 +138,10 @@ var _ = Describe("Feature tracking capability", func() {
 			})
 
 			// when
-			Expect(featuresHandler.Apply()).To(Succeed())
+			Expect(featuresHandler.Apply(ctx)).To(Succeed())
 
 			// then
-			featureTracker, err := fixtures.GetFeatureTracker(envTestClient, appNamespace, "always-working-feature")
+			featureTracker, err := fixtures.GetFeatureTracker(ctx, envTestClient, appNamespace, "always-working-feature")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(featureTracker.Spec.Source).To(
 				MatchFields(IgnoreExtras, Fields{
@@ -150,7 +151,7 @@ var _ = Describe("Feature tracking capability", func() {
 			)
 		})
 
-		It("should correctly indicate app namespace in the feature tracker", func() {
+		It("should correctly indicate app namespace in the feature tracker", func(ctx context.Context) {
 			// given
 			featuresHandler := feature.ClusterFeaturesHandler(dsci, func(registry feature.FeaturesRegistry) error {
 				emptyFeatureErr := registry.Add(feature.Define("empty-feature").
@@ -163,10 +164,10 @@ var _ = Describe("Feature tracking capability", func() {
 			})
 
 			// when
-			Expect(featuresHandler.Apply()).To(Succeed())
+			Expect(featuresHandler.Apply(ctx)).To(Succeed())
 
 			// then
-			featureTracker, err := fixtures.GetFeatureTracker(envTestClient, appNamespace, "empty-feature")
+			featureTracker, err := fixtures.GetFeatureTracker(ctx, envTestClient, appNamespace, "empty-feature")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(featureTracker.Spec.AppNamespace).To(Equal("default"))
 		})

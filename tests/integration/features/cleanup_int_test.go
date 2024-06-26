@@ -54,23 +54,25 @@ var _ = Describe("feature cleanup", func() {
 
 		})
 
-		It("should successfully create resource and associated feature tracker", func() {
+		It("should successfully create resource and associated feature tracker", func(ctx context.Context) {
 			// when
-			Expect(testFeature.Apply()).Should(Succeed())
+			Expect(testFeature.Apply(ctx)).Should(Succeed())
 
 			// then
 			Eventually(createdSecretHasOwnerReferenceToOwningFeature(namespace, secretName)).
+				WithContext(ctx).
 				WithTimeout(fixtures.Timeout).
 				WithPolling(fixtures.Interval).
 				Should(Succeed())
 		})
 
-		It("should remove feature tracker on clean-up", func() {
+		It("should remove feature tracker on clean-up", func(ctx context.Context) {
 			// when
-			Expect(testFeature.Cleanup()).To(Succeed())
+			Expect(testFeature.Cleanup(ctx)).To(Succeed())
 
 			// then
 			Eventually(createdSecretHasOwnerReferenceToOwningFeature(namespace, secretName)).
+				WithContext(ctx).
 				WithTimeout(fixtures.Timeout).
 				WithPolling(fixtures.Interval).
 				Should(WithTransform(errors.IsNotFound, BeTrue()))
@@ -80,11 +82,11 @@ var _ = Describe("feature cleanup", func() {
 
 })
 
-func createdSecretHasOwnerReferenceToOwningFeature(namespace, secretName string) func() error {
-	return func() error {
+func createdSecretHasOwnerReferenceToOwningFeature(namespace, secretName string) func(context.Context) error {
+	return func(ctx context.Context) error {
 		secret, err := envTestClientset.CoreV1().
 			Secrets(namespace).
-			Get(context.TODO(), secretName, metav1.GetOptions{})
+			Get(ctx, secretName, metav1.GetOptions{})
 
 		if err != nil {
 			return err
@@ -105,7 +107,7 @@ func createdSecretHasOwnerReferenceToOwningFeature(namespace, secretName string)
 		}
 
 		tracker := &featurev1.FeatureTracker{}
-		return envTestClient.Get(context.Background(), client.ObjectKey{
+		return envTestClient.Get(ctx, client.ObjectKey{
 			Name: trackerName,
 		}, tracker)
 	}

@@ -29,8 +29,8 @@ func (e *withConditionReasonError) Error() string {
 
 // createFeatureTracker creates a FeatureTracker, persists it in the cluster,
 // and attaches it to the provided Feature instance.
-func createFeatureTracker(f *Feature) error {
-	tracker, errGet := getFeatureTracker(f)
+func createFeatureTracker(ctx context.Context, f *Feature) error {
+	tracker, errGet := getFeatureTracker(ctx, f)
 	if client.IgnoreNotFound(errGet) != nil {
 		return errGet
 	}
@@ -41,7 +41,7 @@ func createFeatureTracker(f *Feature) error {
 			Source:       *f.source,
 			AppNamespace: f.TargetNamespace,
 		}
-		if errCreate := f.Client.Create(context.TODO(), tracker); errCreate != nil {
+		if errCreate := f.Client.Create(ctx, tracker); errCreate != nil {
 			return errCreate
 		}
 	}
@@ -55,23 +55,23 @@ func createFeatureTracker(f *Feature) error {
 	return nil
 }
 
-func removeFeatureTracker(f *Feature) error {
+func removeFeatureTracker(ctx context.Context, f *Feature) error {
 	associatedTracker := f.tracker
 	if associatedTracker == nil {
 		// Check if it is persisted in the cluster, but Feature do not have it attached
-		if tracker, errGet := getFeatureTracker(f); errGet != nil {
+		if tracker, errGet := getFeatureTracker(ctx, f); errGet != nil {
 			return errGet
 		} else {
 			associatedTracker = tracker
 		}
 	}
-	return client.IgnoreNotFound(f.Client.Delete(context.Background(), associatedTracker))
+	return client.IgnoreNotFound(f.Client.Delete(ctx, associatedTracker))
 }
 
-func getFeatureTracker(f *Feature) (*featurev1.FeatureTracker, error) {
+func getFeatureTracker(ctx context.Context, f *Feature) (*featurev1.FeatureTracker, error) {
 	tracker := featurev1.NewFeatureTracker(f.Name, f.TargetNamespace)
 
-	if errGet := f.Client.Get(context.Background(), client.ObjectKeyFromObject(tracker), tracker); errGet != nil {
+	if errGet := f.Client.Get(ctx, client.ObjectKeyFromObject(tracker), tracker); errGet != nil {
 		return nil, errGet
 	}
 
