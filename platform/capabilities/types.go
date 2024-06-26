@@ -117,7 +117,7 @@ func (r *Registry) ConfigureCapabilities(ctx context.Context, cli client.Client,
 func (r *Registry) definePlatformDeployment() feature.FeaturesProvider {
 	return func(registry feature.FeaturesRegistry) error {
 		return registry.Add(
-			feature.Define("deploy-odh-platform").
+			feature.Define("odh-platform-deployment").
 				Manifests(kustomize.Location("/opt/manifests/platform/default")),
 		)
 	}
