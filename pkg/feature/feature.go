@@ -59,7 +59,7 @@ type Feature struct {
 }
 
 // Action is a func type which can be used for different purposes while having access to Feature struct.
-type Action func(ctx context.Context, feature *Feature) error
+type Action func(ctx context.Context, f *Feature) error
 
 // Apply applies the feature to the cluster.
 // It creates a FeatureTracker resource to establish ownership and reports the result of the operation as a condition.
