@@ -52,7 +52,7 @@ func (a *AuthorizationCapability) ProtectedResources(protectedResource ...Protec
 	a.protectedResources = protectedResource
 }
 
-func (a *AuthorizationCapability) asJSON() ([]byte, error) {
+func (a *AuthorizationCapability) AsJSON() ([]byte, error) {
 	return json.Marshal(a.protectedResources)
 }
 

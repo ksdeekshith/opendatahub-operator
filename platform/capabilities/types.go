@@ -138,7 +138,7 @@ func (r *Registry) Save(ctx context.Context, cli client.Client, metaOptions ...c
 	// if requested at all
 	platformSettings := make(map[string]string)
 
-	authzJSON, authzErr := r.authorization.asJSON()
+	authzJSON, authzErr := r.authorization.AsJSON()
 	if authzErr != nil {
 		return authzErr
 	}
