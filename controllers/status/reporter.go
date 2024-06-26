@@ -31,7 +31,7 @@ func NewStatusReporter[T client.Object](cli client.Client, object T, determine D
 }
 
 // ReportCondition updates the status of the object using the determineCondition function.
-func (r *Reporter[T]) ReportCondition(ctx context.Context, optionalErr error) (T, error) { //nolint:ireturn //reason: returns T satisfying client.Object interface
+func (r *Reporter[T]) ReportCondition(ctx context.Context, optionalErr error) (T, error) {
 	return UpdateWithRetry[T](ctx, r.client, r.object, r.determineCondition(optionalErr))
 }
 
@@ -39,7 +39,7 @@ func (r *Reporter[T]) ReportCondition(ctx context.Context, optionalErr error) (T
 type SaveStatusFunc[T client.Object] func(saved T)
 
 // UpdateWithRetry updates the status of object using passed function and retries on conflict.
-func UpdateWithRetry[T client.Object](ctx context.Context, cli client.Client, original T, update SaveStatusFunc[T]) (T, error) { //nolint:ireturn,lll //reason: returns T satisfying client.Object interface
+func UpdateWithRetry[T client.Object](ctx context.Context, cli client.Client, original T, update SaveStatusFunc[T]) (T, error) {
 	saved, ok := original.DeepCopyObject().(T)
 	if !ok {
 		return *new(T), errors.New("failed to deep copy object")

@@ -1,4 +1,3 @@
-//nolint:ireturn //reason: returning generic T any (interface{})
 package provider
 
 import (
@@ -47,7 +46,7 @@ func (d DataProviderWithDefault[T]) Get(_ context.Context, _ client.Client) (T, 
 }
 
 // Value returns actual value stored by the provider.
-func (d DataProviderWithDefault[T]) Value() T { //nolint:ireturn //reason: returns generic T
+func (d DataProviderWithDefault[T]) Value() T {
 	return d.value
 }
 

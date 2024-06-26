@@ -1,16 +1,14 @@
-//nolint:ireturn //reason: false positive, builtins.NamespaceTransformerPlugin is a struct
 package plugins
 
 import (
 	"sigs.k8s.io/kustomize/api/builtins" //nolint:staticcheck // Remove after package update
 	"sigs.k8s.io/kustomize/api/filters/namespace"
-	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/kustomize/kyaml/resid"
 )
 
 // CreateNamespaceApplierPlugin creates a plugin to ensure resources have the specified target namespace.
-func CreateNamespaceApplierPlugin(targetNamespace string) resmap.Transformer { //nolint:ireturn //reason returning struct conflicts due to pointer receiver
+func CreateNamespaceApplierPlugin(targetNamespace string) *builtins.NamespaceTransformerPlugin {
 	return &builtins.NamespaceTransformerPlugin{
 		ObjectMeta: types.ObjectMeta{
 			Name:      "odh-namespace-plugin",

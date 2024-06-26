@@ -1,4 +1,3 @@
-//nolint:ireturn //reason: returning generic T data type
 package feature
 
 import (
