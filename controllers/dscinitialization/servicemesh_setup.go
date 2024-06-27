@@ -124,9 +124,9 @@ func (r *DSCInitializationReconciler) authorizationCapability(ctx context.Contex
 	), nil
 }
 
-func (r *DSCInitializationReconciler) serviceMeshCapabilityFeatures(dsci *dsciv1.DSCInitialization) feature.FeaturesProvider {
+func (r *DSCInitializationReconciler) serviceMeshCapabilityFeatures(instance *dsciv1.DSCInitialization) feature.FeaturesProvider {
 	return func(registry feature.FeaturesRegistry) error {
-		serviceMeshSpec := dsci.Spec.ServiceMesh
+		serviceMeshSpec := instance.Spec.ServiceMesh
 
 		smcp := feature.Define("mesh-control-plane-creation").
 			Manifests(
@@ -135,7 +135,7 @@ func (r *DSCInitializationReconciler) serviceMeshCapabilityFeatures(dsci *dsciv1
 						path.Join(Templates.ServiceMeshDir),
 					),
 			).
-			WithData(servicemesh.FeatureData.ControlPlane.Create(&dsci.Spec).AsAction()).
+			WithData(servicemesh.FeatureData.ControlPlane.Create(&instance.Spec).AsAction()).
 			PreConditions(
 				servicemesh.EnsureServiceMeshOperatorInstalled,
 				feature.CreateNamespaceIfNotExists(serviceMeshSpec.ControlPlane.Namespace),
@@ -153,7 +153,7 @@ func (r *DSCInitializationReconciler) serviceMeshCapabilityFeatures(dsci *dsciv1
 						),
 				).
 				WithData(
-					servicemesh.FeatureData.ControlPlane.Create(&dsci.Spec).AsAction(),
+					servicemesh.FeatureData.ControlPlane.Create(&instance.Spec).AsAction(),
 				).
 				PreConditions(
 					servicemesh.EnsureServiceMeshInstalled,
@@ -167,10 +167,10 @@ func (r *DSCInitializationReconciler) serviceMeshCapabilityFeatures(dsci *dsciv1
 		cfgMap := feature.Define("mesh-shared-configmap").
 			WithResources(servicemesh.MeshRefs, servicemesh.AuthRefs).
 			WithData(
-				servicemesh.FeatureData.ControlPlane.Create(&dsci.Spec).AsAction(),
+				servicemesh.FeatureData.ControlPlane.Create(&instance.Spec).AsAction(),
 			).
 			WithData(
-				servicemesh.FeatureData.Authorization.All(&dsci.Spec)...,
+				servicemesh.FeatureData.Authorization.All(&instance.Spec)...,
 			)
 
 		return registry.Add(smcp, cfgMap)
