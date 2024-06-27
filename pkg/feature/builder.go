@@ -1,6 +1,7 @@
 package feature
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
@@ -123,6 +124,20 @@ func (fb *featureBuilder) WithData(dataProviders ...Action) *featureBuilder {
 	return fb
 }
 
+// EnabledWhen determines if a Feature should be loaded and applied based on specified criteria.
+// The criteria are supplied as a function.
+//
+// Note: The function passed should consistently return true while the feature is needed.
+// If the function returns false at any point, the feature's contents might be removed during the reconciliation process.
+func (fb *featureBuilder) EnabledWhen(enabled EnabledFunc) *featureBuilder {
+	fb.builders = append(fb.builders, func(f *Feature) error {
+		f.Enabled = enabled
+
+		return nil
+	})
+	return fb
+}
+
 // WithResources allows to define programmatically which resources should be created when applying defined Feature.
 func (fb *featureBuilder) WithResources(resources ...Action) *featureBuilder {
 	fb.builders = append(fb.builders, func(f *Feature) error {
@@ -176,10 +191,14 @@ func (fb *featureBuilder) OnDelete(cleanups ...Action) *featureBuilder {
 // Create creates a new Feature instance and add it to corresponding FeaturesHandler.
 // The actual feature creation in the cluster is not performed here.
 func (fb *featureBuilder) Create() (*Feature, error) {
+	alwaysEnabled := func(_ context.Context, feature *Feature) (bool, error) {
+		return true, nil
+	}
+
 	f := &Feature{
 		Name:    fb.featureName,
 		Managed: fb.managed,
-		Enabled: true,
+		Enabled: alwaysEnabled,
 		Log:     log.Log.WithName("features").WithValues("feature", fb.featureName),
 		source:  &fb.source,
 	}
