@@ -59,13 +59,20 @@ func removeFeatureTracker(ctx context.Context, f *Feature) error {
 	associatedTracker := f.tracker
 	if associatedTracker == nil {
 		// Check if it is persisted in the cluster, but Feature do not have it attached
-		if tracker, errGet := getFeatureTracker(ctx, f); errGet != nil {
+		if tracker, errGet := getFeatureTracker(ctx, f); client.IgnoreNotFound(errGet) != nil {
 			return errGet
 		} else {
 			associatedTracker = tracker
 		}
 	}
-	return client.IgnoreNotFound(f.Client.Delete(ctx, associatedTracker))
+
+	if associatedTracker != nil {
+		return client.IgnoreNotFound(f.Client.Delete(ctx, associatedTracker))
+	}
+
+	f.Log.Info("FeatureTracker not found, skipping deletion", "feature", f.Name)
+
+	return nil
 }
 
 func getFeatureTracker(ctx context.Context, f *Feature) (*featurev1.FeatureTracker, error) {
