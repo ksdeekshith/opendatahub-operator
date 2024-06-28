@@ -67,15 +67,11 @@ func (a *AuthorizationCapability) IsRequired() bool {
 	return len(a.protectedResources) > 0
 }
 
-// Configure enables the Authorization capability and component-specific configuration through registered hooks.
-func (a *AuthorizationCapability) Configure(ctx context.Context, cli client.Client, metaOptions ...cluster.MetaOptions) error {
+// Reconcile ensures Authorization capability and component-specific configuration is wired when needed.
+func (a *AuthorizationCapability) Reconcile(ctx context.Context, cli client.Client, metaOptions ...cluster.MetaOptions) error {
 	if a.IsRequired() {
 		return CreateOrUpdateAuthzBindings(ctx, cli, a.protectedResources, metaOptions...)
 	}
 
-	return DeleteAuthzBindings(ctx, cli)
-}
-
-func (a *AuthorizationCapability) Remove(ctx context.Context, cli client.Client) error {
 	return DeleteAuthzBindings(ctx, cli)
 }

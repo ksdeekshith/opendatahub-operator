@@ -9,6 +9,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dsciv1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/dscinitialization/v1"
+	featurev1 "github.com/opendatahub-io/opendatahub-operator/v2/apis/features/v1"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/feature/kustomize"
@@ -22,8 +23,7 @@ import (
 // TODO(mvp) rename - what are we going to use it for? adding stuff for capability?
 type Handler interface {
 	IsRequired() bool
-	Configure(ctx context.Context, cli client.Client, metaOptions ...cluster.MetaOptions) error
-	Remove(ctx context.Context, cli client.Client) error
+	Reconcile(ctx context.Context, cli client.Client, metaOptions ...cluster.MetaOptions) error
 }
 
 type Availability interface {
@@ -65,60 +65,28 @@ func (r *Registry) ConfigureCapabilities(ctx context.Context, cli client.Client,
 		return false
 	}
 
-	configure := func(handlers ...Handler) error {
-		var errConfig *multierror.Error
-		for _, handler := range handlers {
-			errConfig = multierror.Append(errConfig, handler.Configure(ctx, cli, metaOptions...))
-		}
-
-		return errConfig.ErrorOrNil()
+	var errReconcile *multierror.Error
+	for _, handler := range handlers {
+		errReconcile = multierror.Append(errReconcile, handler.Reconcile(ctx, cli, metaOptions...))
 	}
 
-	remove := func(handlers ...Handler) error {
-		var errRemove *multierror.Error
-		for _, handler := range handlers {
-			errRemove = multierror.Append(errRemove, handler.Remove(ctx, cli))
-		}
+	platformFeatures := feature.NewFeaturesHandler(
+		dsciSpec.ApplicationsNamespace,
+		featurev1.Source{Type: featurev1.PlatformCapabilityType, Name: "authorization"},
+		r.definePlatformDeployment(isRequired(handlers...)),
+	)
 
-		return errRemove.ErrorOrNil()
-	}
-
-	var err error
-
-	authInitializer := feature.ComponentFeaturesHandler("Platform", dsciSpec.ApplicationsNamespace, r.definePlatformDeployment())
-
-	// TODO(mvp): we need to track state if we once were deployed, but now not needed?
-	if isRequired(handlers...) {
-		// return nil // nothing to do..
-		err = authInitializer.Apply(ctx)
-		if err != nil {
-			return err
-		}
-
-		// TODO(mvp): instead of a defined configure/remove phase.. should we simply call remove if !HasBeenConfigured incase it once was?
-		err = configure(handlers...)
-		if err != nil {
-			return err
-		}
-	} else {
-		if err := authInitializer.Delete(ctx); err != nil {
-			return err
-		}
-
-		// TODO(mvp): if none are required - we have to remove all
-		// TODO(mvp): how to deal with DSC/DSCI removal
-		if err := remove(handlers...); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return platformFeatures.Apply(ctx)
 }
 
-func (r *Registry) definePlatformDeployment() feature.FeaturesProvider {
+func (r *Registry) definePlatformDeployment(required bool) feature.FeaturesProvider {
 	return func(registry feature.FeaturesRegistry) error {
 		return registry.Add(
 			feature.Define("odh-platform-deployment").
+				EnabledWhen(func(_ context.Context, _ *feature.Feature) (bool, error) {
+					return required, nil
+				}).
+				Managed().
 				Manifests(kustomize.Location("/opt/manifests/platform/default")),
 		)
 	}
