@@ -154,6 +154,7 @@ func main() { //nolint:funlen
 			DSCISpec: &dsciv1.DSCInitializationSpec{
 				ApplicationsNamespace: dscApplicationsNamespace,
 			},
+			DSCIStatus: &dsciv1.DSCInitializationStatus{},
 		},
 		Recorder: mgr.GetEventRecorderFor("datasciencecluster-controller"),
 	}).SetupWithManager(ctx, mgr); err != nil {
