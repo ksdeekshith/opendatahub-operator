@@ -45,13 +45,14 @@ type PlatformCapabilities interface {
 
 // Registry used by Components to register their Capabilities configuration.
 type Registry struct {
+	// owner           metav1.ObjectMeta
+	// targetNamespace string
 	authorization AuthorizationCapability
 }
 
 // TODO: include OwnedBy for DSC clean up, both Registry and Handler.
 func (r *Registry) ConfigureCapabilities(ctx context.Context, cli client.Client, dsciSpec *dsciv1.DSCInitializationSpec, metaOptions ...cluster.MetaOptions) error {
-	// iterate over all handlers and configure
-
+	// TODO(mvp): make it a dynamic slice
 	handlers := []Handler{&r.authorization}
 
 	isRequired := func(handlers ...Handler) bool {
@@ -150,7 +151,6 @@ func (r *Registry) Save(ctx context.Context, cli client.Client, metaOptions ...c
 		labels.K8SCommon.ManagedBy, "opendatahub-operator", // TODO change to platform-type aware
 	)) // TODO make label metaopt a var outside of here
 
-	// TODO change signature to pass ctx as first param
 	return cluster.CreateOrUpdateConfigMap(
 		ctx,
 		cli,

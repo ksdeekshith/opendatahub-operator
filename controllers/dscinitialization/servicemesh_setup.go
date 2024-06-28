@@ -218,7 +218,14 @@ func (r *DSCInitializationReconciler) authorizationFeatures(dsci *dsciv1.DSCInit
 					servicemesh.EnsureAuthNamespaceExists,
 					func(ctx context.Context, f *feature.Feature) error {
 						return feature.WaitForPodsToBeReady(serviceMeshSpec.Auth.Namespace)(ctx, f)
-					}).
+					},
+				).
+				WithData(
+					servicemesh.FeatureData.ControlPlane.Create(&dsci.Spec).AsAction(),
+				).
+				WithData(
+					servicemesh.FeatureData.Authorization.All(&dsci.Spec)...,
+				).
 				Manifests(
 					manifest.Location(Templates.Location).
 						Include(path.Join(Templates.AuthorinoDir, "deployment.injection.patch.tmpl.yaml")),

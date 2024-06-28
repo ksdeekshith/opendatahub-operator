@@ -260,7 +260,7 @@ func (r *DataScienceClusterReconciler) Reconcile(ctx context.Context, req ctrl.R
 		}
 	}
 
-	// TODO can we have no-capability mode at all? should we then just move on
+	// TODO(mvp): can we have no-capability mode at all? should we then just move on
 	if saveErr := capabilitiesRegistry.Save(ctx, r.Client,
 		cluster.OwnedBy(instance, r.Scheme),
 		cluster.InNamespace(r.DataScienceCluster.DSCISpec.ApplicationsNamespace),
