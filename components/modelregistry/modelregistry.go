@@ -118,18 +118,19 @@ func (m *ModelRegistry) ReconcileComponent(ctx context.Context, cli client.Clien
 func (m *ModelRegistry) ProtectedResources() []capabilities.ProtectedResource {
 	return []capabilities.ProtectedResource{
 		{
-			GroupVersionKind: schema.GroupVersionKind{
-				Group:   "modelregistry.opendatahub.io",
-				Version: "v1alpha1",
-				Kind:    "ModelRegistry",
+			Schema: capabilities.ResourceSchema{
+				GroupVersionKind: schema.GroupVersionKind{
+					Group:   "modelregistry.opendatahub.io",
+					Version: "v1alpha1",
+					Kind:    "ModelRegistry",
+				},
+				Resources: "modelregistries",
 			},
-			Resources: "modelregistries",
-			HostPaths: []string{"status.URL"},
-
 			WorkloadSelector: map[string]string{
 				"app.kubernetes.io/component": "model-registry",
 			},
-			Ports: []string{"8080"},
+			HostPaths: []string{"status.URL"},
+			Ports:     []string{"8080"},
 		},
 	}
 }

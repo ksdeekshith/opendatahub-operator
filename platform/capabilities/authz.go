@@ -14,16 +14,21 @@ import (
 
 // ProtectedResource defines a custom resource type that the component requires capability for.
 type ProtectedResource struct {
-	// GroupVersionKind specifies the group, version, and kind of the resource.
-	schema.GroupVersionKind `json:"gvk,omitempty"`
+	// Schema is the schema of the resource.
+	Schema ResourceSchema `json:"schema,omitempty"`
 	// WorkloadSelector is a map of labels used to select the workload.
 	WorkloadSelector map[string]string `json:"workloadSelector,omitempty"`
-	// Resources is the type of resource being protected, e.g., "pods", "services".
-	Resources string `json:"resources,omitempty"`
 	// HostPaths is a list of host paths associated with the resource.
 	HostPaths []string `json:"hostPaths,omitempty"`
 	// Ports is a list of ports associated with the resource.
 	Ports []string `json:"ports,omitempty"`
+}
+
+type ResourceSchema struct {
+	// GroupVersionKind specifies the group, version, and kind of the resource.
+	schema.GroupVersionKind `json:"gvk,omitempty"`
+	// Resources is the type of resource being protected, e.g., "pods", "services".
+	Resources string `json:"resources,omitempty"`
 }
 
 func NewAuthorization(available bool) AuthorizationCapability {

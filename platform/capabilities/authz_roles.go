@@ -43,8 +43,8 @@ func createAuthRules(protectedResources []ProtectedResource) []rbacv1.PolicyRule
 	apiGroups := make([]string, 0)
 	resources := make([]string, 0)
 	for _, resource := range protectedResources {
-		apiGroups = append(apiGroups, resource.GroupVersionKind.Group)
-		resources = append(resources, resource.Resources)
+		apiGroups = append(apiGroups, resource.Schema.GroupVersionKind.Group)
+		resources = append(resources, resource.Schema.Resources)
 	}
 
 	return []rbacv1.PolicyRule{
